@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: 000-create-ext-extension
+      author: Alex
+      changes:
+        - sql:
+            sql: CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+  - changeSet:
+
+      id: 001-create-user-preset-table
+      author: Alex
+      changes:
+        - createTable:
+            tableName: config_preset
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: uuid_generate_v4()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: telegram_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: calories_per_day
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: false
