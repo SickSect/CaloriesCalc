@@ -16,8 +16,12 @@ start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
     resize_keyboard=True)
 main_keyboard = ReplyKeyboardMarkup(
-    [[KeyboardButton("Установить суточные калории")]]
+    [[KeyboardButton("Установить суточные калории")],
+    [KeyboardButton("Добавить калории")]]
 )
+
+# Определяем состояния диалога
+SET_CALORIES, ADD_PRODUCT, SET_TODAY_CALORIES, SET_PRODUCT_NAME = range(4)
 
 # --- Обработка /start или любого первого сообщения
 async def start(update: Update, context: CallbackContext):
@@ -56,27 +60,46 @@ async def start_calories_setup(update, context):
     )
     return SET_CALORIES
 
-async def set_calories(update: Update, context: Context):
+async def start_today_calories_setup(update, context):
+    """Начинает процесс добавления калорий на сегодня"""
+    await update.message.reply_text(
+        "Пожалуйста, введите количество калорий:",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return SET_TODAY_CALORIES
+
+async def set_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает ввод калорий"""
     user_id = update.effective_user.id
     try:
         calories = int(update.message.text)
-        # Сохраняем калории в контексте или базе данных
-        context.user_data['daily_calories'] = calories
-
+        db.set_daily_calories(user_id, calories)
         await update.message.reply_text(
             f"Установлено {calories} калорий в день!",
             reply_markup=main_keyboard
         )
-        db.set_daily_calories(user_id, calories)
         return ConversationHandler.END
     except ValueError:
-        await update.message.reply_text("Пожалуйста, введите число:")
+        await update.message.reply_text("Пожалуйста, введите число:", reply_markup=main_keyboard)
         return SET_CALORIES
 
+async def set_product_name(update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["product_name"] = update.message.text.strip()
+    db.add_calories_for_today(update.effective_user.id, context.user_data["today_calories"], context.user_data["product_name"])
+    return ConversationHandler.END
 
-# Определяем состояния диалога
-SET_CALORIES, ADD_PRODUCT = range(2)
+async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает ввод калорий за сегодняшний день"""
+    try:
+        calories = int(update.message.text.strip())
+        context.user_data["today_calories"] = calories
+        await update.message.reply_text(
+            "Пожалуйста, введите название продукта:"
+        )
+        return SET_PRODUCT_NAME
+    except ValueError:
+        await update.message.reply_text("Пожалуйста, введите число:", reply_markup=main_keyboard)
+        return SET_TODAY_CALORIES
 
 # --- Запуск бота ---
 def main():
@@ -86,9 +109,12 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
     calories_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup)],
+            MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),
+            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup)],
         states={
             SET_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories)],
+            SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
+            SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)]
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
