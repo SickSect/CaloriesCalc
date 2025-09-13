@@ -61,6 +61,22 @@ class Database:
                 return True
             return False
 
+    def get_todays_calories(self, telegram_id):
+        current_date = datetime.date.today()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_calories_history WHERE telegram_id=$1 and date=$2", (telegram_id, current_date))
+            rows = cursor.fetchall()
+            total_calories = 0
+            if rows:
+                for row in rows:
+                    total_calories += row['daily_calories']
+                return total_calories
+            else:
+                return 0
+
+
+
     def set_daily_calories(self, telegram_id, daily_calories):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
