@@ -21,9 +21,17 @@ class Database:
                     ''')
 
             cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS products (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        calories_per_hundread INTEGER NOT NULL,
+                        product_name TEXT NOT NULL
+                    )
+            ''')
+
+            cursor.execute('''
                         CREATE TABLE IF NOT EXISTS user_calories_history (
                         id TEXT PRIMARY KEY NOT NULL,
-                        telegram_id INTEGER UNIQUE NOT NULL,
+                        telegram_id INTEGER NOT NULL,
                         todays_calories INTEGER DEFAULT 0,
                         product_name TEXT NOT NULL,
                         order_id INTEGER NOT NULL,
@@ -65,14 +73,13 @@ class Database:
         current_date = datetime.date.today()
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT todays_calories FROM user_calories_history WHERE telegram_id=$1 and date=$2", (telegram_id, current_date))
+            cursor.execute("SELECT todays_calories, product_name FROM user_calories_history WHERE telegram_id=$1 and date=$2", (telegram_id, current_date))
             rows = cursor.fetchall()
-            total_calories = 0
+            report = []
             if rows:
                 for row in rows:
-                    row_calories = row[0]
-                    total_calories += row_calories
-                return total_calories
+                    report.append([row[1], row[0]])
+                return report
             else:
                 return None
 
@@ -84,6 +91,23 @@ class Database:
             result = cursor.execute("UPDATE calories_config SET daily_calories = $1 where telegram_id=$2", [daily_calories, telegram_id])
             conn.commit()
 
+    def add_product(self, product_name: str, calories_per_hundread: int):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO products (id, calories_per_hundread, product_name) VALUES (?,?,?)", (str(uuid.uuid4()), calories_per_hundread, product_name))
+            conn.commit()
+
+    def get_products_info(self):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT product_name, calories_per_hundread FROM products")
+            result = cursor.fetchall()
+            product_list = []
+            for row in result:
+                product_list.append([row[0], row[1]])
+            return product_list
+
+
     def add_calories_for_today(self, telegram_id, today_calories, product_name):
         current_date = datetime.date.today()
         with sqlite3.connect(self.db_path) as conn:
@@ -91,11 +115,12 @@ class Database:
             cursor.execute("SELECT todays_calories, order_id FROM user_calories_history WHERE telegram_id=$1 AND date=$2", [telegram_id,current_date])
             row = cursor.fetchone()
             if row:
+                user_uuid = str(uuid.uuid4())
                 old_calories = row[0]
                 order_id = row[1]
                 print("Save new note:", [old_calories + today_calories, product_name, order_id + 1, telegram_id, current_date])
                 result = cursor.execute("INSERT INTO user_calories_history (id, telegram_id, todays_calories, product_name, order_id, date) VALUES (?, ?, ?, ?, ?, ?)",
-                                        (old_calories + today_calories, product_name, order_id + 1, telegram_id, current_date))
+                                        (user_uuid, telegram_id, old_calories + today_calories, product_name, order_id + 1, current_date))
             else:
                 user_uuid = str(uuid.uuid4())
                 cursor.execute(

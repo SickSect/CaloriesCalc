@@ -7,6 +7,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 
 from db import Database
+from str_utils import print_daily_report, init_product_table, print_product_info
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -31,6 +32,10 @@ async def start(update: Update, context: CallbackContext):
     reply_markup = start_keyboard
     await update.message.reply_text("Приветствие", reply_markup=reply_markup)
 
+async def get_main_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    reply_markup = start_keyboard
+    await update.message.reply_text("", reply_markup=reply_markup)
+
 async def handle_start_button(update: Update,  context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not db.check_user_exists(user_id):
@@ -39,16 +44,20 @@ async def handle_start_button(update: Update,  context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("Мы нашли ваши заметки!", reply_markup=main_keyboard)
 
+async def handle_info_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    list = db.get_products_info()
+    await update.message.reply_text(print_product_info(list), reply_markup=main_keyboard)
+
 async def handle_today_calories(update: Update,  context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not db.check_user_exists(user_id):
         db.add_user(user_id)
         await update.message.reply_text("Добавил вас!", reply_markup=main_keyboard)
     else:
-        calories = db.get_today_calories(user_id)
-        if calories is not None:
-            await  update.message.reply_text( "Сегодня употребили: ", reply_markup=main_keyboard)
-        elif calories is None:
+        report = db.get_today_calories(user_id)
+        if report is not None:
+            await update.message.reply_text( f"{print_daily_report(report)}", reply_markup=main_keyboard)
+        elif report is None:
             await update.message.reply_text( "Сегодня калории не записаны", reply_markup=main_keyboard)
         else:
             await update.message.reply_text("Непредвиденная ошибка", reply_markup=main_keyboard)
@@ -103,6 +112,7 @@ async def set_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def set_product_name(update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["product_name"] = update.message.text.strip()
     db.add_calories_for_today(update.effective_user.id, context.user_data["today_calories"], context.user_data["product_name"])
+    await update.message.reply_text(f"Вы подбавили {context.user_data['today_calories']} и продукт {context.user_data['product_name']}", reply_markup=main_keyboard)
     return ConversationHandler.END
 
 async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -120,6 +130,7 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
 
 # --- Запуск бота ---
 def main():
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     print("Bot is starting...")
     app.add_handler(CommandHandler("start", start))
@@ -128,11 +139,13 @@ def main():
     calories_conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),
-            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup)],
+            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup),
+            MessageHandler(filters.TEXT & filters.Regex("^Калорийность продуктов$"), get_product_info)],
         states={
             SET_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories)],
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
-            SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)]
+            SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
+            ConversationHandler.END: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_main_keyboard)]
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
@@ -141,5 +154,6 @@ def main():
 
 if __name__ == "__main__":
     db.init_db()
+    init_product_table(db)
     print("DB initialized...")
     main()
