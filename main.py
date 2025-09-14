@@ -39,14 +39,19 @@ async def handle_start_button(update: Update,  context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text("Мы нашли ваши заметки!", reply_markup=main_keyboard)
 
-async def handle_todays_calories(update: Update,  context: ContextTypes.DEFAULT_TYPE):
+async def handle_today_calories(update: Update,  context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not db.check_user_exists(user_id):
         db.add_user(user_id)
         await update.message.reply_text("Добавил вас!", reply_markup=main_keyboard)
     else:
-        db.get_todays_calories(user_id)
-
+        calories = db.get_today_calories(user_id)
+        if calories is not None:
+            await  update.message.reply_text( "Сегодня употребили: ", reply_markup=main_keyboard)
+        elif calories is None:
+            await update.message.reply_text( "Сегодня калории не записаны", reply_markup=main_keyboard)
+        else:
+            await update.message.reply_text("Непредвиденная ошибка", reply_markup=main_keyboard)
 
 async def handle_main_commands(update: Update,  context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -119,7 +124,7 @@ def main():
     print("Bot is starting...")
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_todays_calories))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))
     calories_conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),
