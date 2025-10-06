@@ -153,8 +153,8 @@ def main():
     calories_conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),
-            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup),
-            MessageHandler(filters.TEXT & filters.Regex("^Калорийность продуктов$"), get_product_info)],
+            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup)],
+            #MessageHandler(filters.TEXT & filters.Regex("^Калорийность продуктов$"), get_product_info)],
         states={
             SET_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories)],
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
