@@ -148,7 +148,7 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
 async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🧪 Тестируем ML модель...")
     # Используем тестовое изображение (если есть)
-    test_image_path = "ml/food_images/test.jpg"
+    test_image_path = "ml/food_images/lemon.jpg"
     if os.path.exists(test_image_path):
         result = food_model.predict(test_image_path)
 
