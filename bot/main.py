@@ -7,6 +7,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 
 from db import Database
+from ml.food_model import food_model
 from str_utils import print_daily_report, init_product_table, print_product_info
 
 load_dotenv()
@@ -21,7 +22,8 @@ main_keyboard = ReplyKeyboardMarkup(
         [KeyboardButton("Установить суточные калории")],
         [KeyboardButton("Добавить калории")],
         [KeyboardButton("Калории сегодня")],
-        [KeyboardButton("Добавить продукт и его калорийность")]
+        [KeyboardButton("Добавить продукт и его калорийность")],
+        [KeyboardButton("Тест ml модели")]
     ]
 )
 cancel_keyboard = ReplyKeyboardMarkup(
@@ -143,6 +145,30 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
                                         reply_markup=cancel_keyboard)
         return SET_TODAY_CALORIES
 
+async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🧪 Тестируем ML модель...")
+    # Используем тестовое изображение (если есть)
+    test_image_path = "ml/food_images/test.jpg"
+    if os.path.exists(test_image_path):
+        result = food_model.predict(test_image_path)
+
+        if result['success']:
+            response = (
+                f"🎯 Результат анализа:\n"
+                f"• Класс еды: {result['food_class']}\n"
+                f"• Уверенность: {result['confidence']}%\n"
+                f"• {result['message']}"
+            )
+        else:
+            response = f"❌ Ошибка: {result['error']}"
+    else:
+        response = (
+            "📸 Для теста модели нужно фото еды!\n"
+            "Отправьте фото еды с подписью, и я сохраню его для обучения модели."
+        )
+        await update.message.reply_text(response, reply_markup=main_keyboard)
+
+
 # --- Запуск бота ---
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -150,6 +176,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Тест ml модели" + "$"), handle_today_calories))
+
     calories_conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),

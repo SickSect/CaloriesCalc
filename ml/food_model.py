@@ -2,6 +2,8 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 import torch
 from torch import nn
+from PIL import Image
+from torchvision.models import EfficientNet_B0_Weights
 
 
 class FoodModel:
@@ -10,7 +12,7 @@ class FoodModel:
             # CHECK IF CUDA IS AVAILABLE, ELSE - CPU
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
             # USE PRETRAINNED MODEL
-        self.model = models.efficientnet_b0(pretrained=True)
+        self.model = models.efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
             # CLASSIFIER CLASSES
         self.food_classes = [
             'яблоко',
@@ -38,3 +40,26 @@ class FoodModel:
                 std=[0.229, 0.224, 0.225]
             )
         ])
+
+        def predict(self, image_path):
+            print(f"🔍 Анализируем изображение: {image_path}")
+            try:
+                image = Image.open(image_path)
+                print("✅ Изображение успешно загружено")
+                # ЗАГЛУШКА: пока возвращаем тестовый результат
+                # В следующем этапе добавим реальное предсказание
+                return {
+                    'success': True,
+                    'food_class': 'пицца',  # временная заглушка
+                    'confidence': 75.5,  # временная заглушка
+                    'message': 'Это тестовый результат. Нужно собрать данные и обучить модель.'
+                }
+            except Exception as ex:
+                return {
+                    'success': False,
+                    'error': f"Ошибка загрузки изображения: {str(ex)}",
+                    'message': 'Не удалось обработать изображение'
+                }
+
+# Временная глобальная переменная
+food_model = FoodModel()
