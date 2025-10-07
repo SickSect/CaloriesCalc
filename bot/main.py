@@ -1,12 +1,13 @@
 import os
 from contextvars import Context
+from datetime import datetime
 
 from dotenv import load_dotenv
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, MessageHandler, filters, ContextTypes, \
     ConversationHandler
-
 from db import Database
+from ml.dataset_collector import DataCollector
 from ml.food_model import FoodModel
 from str_utils import print_daily_report, init_product_table, print_product_info
 
@@ -14,6 +15,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
 food_model = FoodModel()
+data_collector = DataCollector()
 
 start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
@@ -24,7 +26,8 @@ main_keyboard = ReplyKeyboardMarkup(
         [KeyboardButton("Добавить калории")],
         [KeyboardButton("Калории сегодня")],
         [KeyboardButton("Добавить продукт и его калорийность")],
-        [KeyboardButton("Тест ml модели")]
+        [KeyboardButton("Обучить модель")],
+        [KeyboardButton("Распознать еду")]
     ]
 )
 cancel_keyboard = ReplyKeyboardMarkup(
@@ -147,33 +150,138 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
         return SET_TODAY_CALORIES
 
 async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🧪 Тестируем ML модель...")
-    # Используем тестовое изображение (если есть)
-    test_image_path = "/ml/food_image/lemon.jpg"
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ml_dir = os.path.dirname(os.path.abspath(__file__))
-    print(f"📁 Корень проекта: {project_root}")
-    print(f"📁 Папка ml: {ml_dir}")
-    if os.path.exists(project_root + test_image_path):
-        result = food_model.predict(project_root + test_image_path)
+    """Предсказывает класс еды на фото"""
+    if not food_model.is_trained:
+        await update.message.reply_text(
+            "❌ Модель ещё не обучена!\n"
+            "💡 Сначала соберите данные и обучите модель.",
+            reply_markup=main_keyboard
+        )
+        return
+
+    # Проверяем, есть ли фото в сообщении
+    if not update.message.photo:
+        await update.message.reply_text(
+            "📸 Пришлите фото еды для распознавания!",
+            reply_markup=main_keyboard
+        )
+        return
+
+    try:
+        user_id = update.effective_user.id
+        photo = update.message.photo[-1]
+        file = await context.bot.get_file(photo.file_id)
+
+        # Создаем временный файл
+        temp_path = f"temp_{user_id}_{datetime.now().strftime('%H%M%S')}.jpg"
+        await file.download_to_drive(temp_path)
+
+        # Предсказываем
+        result = food_model.predict(temp_path)
+
+        # Удаляем временный файл
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
         if result['success']:
             response = (
-                f"🎯 Результат анализа:\n"
-                f"• Класс еды: {result['food_class']}\n"
+                f"🎯 Результат распознавания:\n"
+                f"• Класс: {result['food_class']}\n"
                 f"• Уверенность: {result['confidence']}%\n"
                 f"• {result['message']}"
             )
+
+            # Показываем все вероятности
+            if 'all_probabilities' in result:
+                response += "\n\n📊 Все вероятности:\n"
+                for cls, prob in result['all_probabilities'].items():
+                    response += f"• {cls}: {prob}%\n"
         else:
             response = f"❌ Ошибка: {result['error']}"
-    else:
-        response = (
-            "📸 Для теста модели нужно фото еды!\n"
-            "Отправьте фото еды с подписью, и я сохраню его для обучения модели."
+
+        await update.message.reply_text(response, reply_markup=main_keyboard)
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Ошибка при распознавании: {str(e)}",
+            reply_markup=main_keyboard
         )
+
+
+# Добавляем команду для обучения модели
+async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обучает модель на собранных данных"""
+    await update.message.reply_text("🧠 Проверяем возможность обучения...")
+
+    stats = data_collector.get_stats()
+
+    if not stats['can_train']:
+        response = (
+            f"❌ Недостаточно данных для обучения!\n"
+            f"📊 Собрано: {stats['trainable_samples']} фото\n"
+            f"🎯 Нужно: минимум 20 фото\n\n"
+            f"💡 Продолжайте отправлять фото еды с описаниями!"
+        )
+    else:
+        await update.message.reply_text("🎯 Начинаем обучение модели... Это займёт несколько минут.")
+
+        # Обучаем модель
+        success = food_model.train(data_collector, epochs=15)
+
+        if success:
+            response = (
+                f"✅ Модель успешно обучена!\n"
+                f"📊 Обучено на: {stats['trainable_samples']} фото\n"
+                f"🎯 Теперь я могу распознавать еду на фото!\n\n"
+                f"📈 Статистика по классам:\n"
+            )
+
+            for cls, count in stats['by_class'].items():
+                response += f"• {cls}: {count} фото\n"
+        else:
+            response = "❌ Не удалось обучить модель. Попробуйте позже."
+
+    await update.message.reply_text(response, reply_markup=main_keyboard)
+
+
+async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Сохраняет фото еды для обучения модели"""
+    try:
+        user_id = update.effective_user.id
+        photo = update.message.photo[-1]
+        file = await context.bot.get_file(photo.file_id)
+
+        caption = update.message.caption or "Фото еды"
+
+        # Скачиваем фото
+        image_bytes = await file.download_as_bytearray()
+
+        # Сохраняем в датасет
+        filename, predicted_class = data_collector.save_food_image(
+            bytes(image_bytes), caption, user_id
+        )
+
+        # Статистика
+        stats = data_collector.get_stats()
+
+        response = (
+            f"📸 Фото сохранено в датасет!\n"
+            f"📝 Описание: '{caption}'\n"
+            f"🏷 Авто-разметка: {predicted_class}\n"
+            f"📊 Всего собрано: {stats['total_images']} фото\n"
+            f"🎯 Готово для обучения: {stats['trainable_samples']} фото"
+        )
+
+        if stats['can_train'] and not food_model.is_trained:
+            response += "\n\n✅ Достаточно данных для обучения модели!"
+
         await update.message.reply_text(response, reply_markup=main_keyboard)
 
-
+    except Exception as e:
+        print(f"❌ Ошибка сохранения фото: {e}")
+        await update.message.reply_text(
+            "❌ Не удалось сохранить фото. Попробуйте ещё раз.",
+            reply_markup=main_keyboard
+        )
 # --- Запуск бота ---
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -181,7 +289,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Тест ml модели" + "$"), predict_food))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Распознать еду" + "$"), predict_food))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Обучить модель" + "$"), train_model_command))
 
     calories_conv_handler = ConversationHandler(
         entry_points=[
