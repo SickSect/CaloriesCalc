@@ -7,12 +7,13 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 
 from db import Database
-from ml.food_model import food_model
+from ml.food_model import FoodModel
 from str_utils import print_daily_report, init_product_table, print_product_info
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
+food_model = FoodModel()
 
 start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
@@ -148,9 +149,13 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
 async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🧪 Тестируем ML модель...")
     # Используем тестовое изображение (если есть)
-    test_image_path = "ml/food_images/lemon.jpg"
-    if os.path.exists(test_image_path):
-        result = food_model.predict(test_image_path)
+    test_image_path = "/ml/food_image/lemon.jpg"
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ml_dir = os.path.dirname(os.path.abspath(__file__))
+    print(f"📁 Корень проекта: {project_root}")
+    print(f"📁 Папка ml: {ml_dir}")
+    if os.path.exists(project_root + test_image_path):
+        result = food_model.predict(project_root + test_image_path)
 
         if result['success']:
             response = (
@@ -176,7 +181,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Тест ml модели" + "$"), handle_today_calories))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Тест ml модели" + "$"), predict_food))
 
     calories_conv_handler = ConversationHandler(
         entry_points=[
