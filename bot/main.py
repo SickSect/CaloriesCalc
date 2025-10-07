@@ -8,6 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 from db import Database
 from ml.dataset_collector import DataCollector
+from ml.dataset_init import init_database
 from ml.food_model import FoodModel
 from str_utils import print_daily_report, init_product_table, print_product_info
 
@@ -311,4 +312,5 @@ def main():
 if __name__ == "__main__":
     db.init_db()
     print("DB initialized...")
+    init_database(data_collector)
     main()

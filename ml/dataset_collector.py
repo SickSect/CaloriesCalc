@@ -1,7 +1,10 @@
+import io
 import sqlite3
 import os
 import shutil
 from datetime import datetime
+
+
 from PIL import Image
 import numpy as np
 
@@ -48,26 +51,51 @@ class DataCollector:
         self.conn.commit()
 
     def save_food_image(self, image_bytes, desc, user_id, predicted_class=None, confidence=0):
-        # Сохраняем фото в датасет
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        filename = f"{timestamp}_{user_id}.jpg"
+        """Сохраняет фото еды в датасет, конвертируя в JPG если нужно"""
+        # Уникальное имя файла
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{timestamp}_{user_id}.jpg"  # Всегда сохраняем как JPG
         image_path = os.path.join(self.images_dir, filename)
-        # Сохраняем изображение
-        with open(image_path, 'wb') as f:
-            f.write(image_bytes)
 
-        if predicted_class is None:
-            predicted_class = self._predict_class_from_text(desc)
-            # Сохраняем в базу
-            self.conn.execute('''
+        try:
+            # Открываем изображение с помощью PIL (поддерживает PNG, JPG, etc.)
+            image = Image.open(io.BytesIO(image_bytes))
+
+            # Конвертируем в RGB если нужно (PNG может иметь альфа-канал)
+            if image.mode in ('RGBA', 'LA', 'P'):
+                # Создаём белый фон для прозрачных PNG
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                if image.mode == 'P':
+                    image = image.convert('RGBA')
+                background.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+                image = background
+            elif image.mode != 'RGB':
+                image = image.convert('RGB')
+
+            # Сохраняем как JPG
+            image.save(image_path, 'JPEG', quality=85)
+            print(f"✅ Изображение сохранено как JPG: {filename}, размер: {image.size}")
+
+        except Exception as e:
+            print(f"❌ Ошибка обработки изображения: {e}")
+            # Пробуем сохранить как есть
+            with open(image_path, 'wb') as f:
+                f.write(image_bytes)
+            print(f"⚠ Сохранено как оригинал: {filename}")
+
+        # Определяем продукт из описания
+        specific_food = self.extract_specific_food(desc)
+
+        # Сохраняем в базу
+        self.conn.execute('''
                     INSERT INTO food_images 
-                    (image_path, user_description, predicted_class, confidence, user_id) 
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (image_path, desc, predicted_class, confidence, user_id))
-            self.conn.commit()
+                    (image_path, user_description, specific_food, user_id) 
+                    VALUES (?, ?, ?, ?)
+                ''', (image_path, desc, specific_food, user_id))
+        self.conn.commit()
 
-        print(f"✅ Сохранено: {filename} -> {predicted_class}")
-        return filename, predicted_class
+        print(f"✅ Данные сохранены: {filename} -> {specific_food}")
+        return filename, specific_food
 
     def _predict_class_from_text(self, description):
         """Простая эвристика для определения класса из текста"""
@@ -78,7 +106,7 @@ class DataCollector:
             return 'фрукты'
         elif any(word in description_lower for word in ['овощ', 'салат', 'морков', 'помидор', 'огур']):
             return 'овощи'
-        elif any(word in description_lower for word in ['мясо', 'куриц', 'говядин', 'свинин', 'рыб']):
+        elif any(word in description_lower for word in ['мясо', 'куриц', 'говядин', 'свинин', 'рыба']):
             return 'мясо_рыба'
         elif any(word in description_lower for word in ['выпечка', 'хлеб', 'булка', 'пирог', 'торт']):
             return 'выпечка'
