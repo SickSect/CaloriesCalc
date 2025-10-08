@@ -38,7 +38,7 @@ cancel_keyboard = ReplyKeyboardMarkup(
 )
 
 # Определяем состояния диалога
-SET_CALORIES, ADD_PRODUCT, SET_TODAY_CALORIES, SET_PRODUCT_NAME = range(4)
+SET_CALORIES, ADD_PRODUCT, SET_TODAY_CALORIES, SET_PRODUCT_NAME, PHOTO = range(5)
 
 # --- Обработка /start или любого первого сообщения
 async def start(update: Update, context: CallbackContext):
@@ -152,8 +152,7 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
                                         reply_markup=cancel_keyboard)
         return SET_TODAY_CALORIES
 
-async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Предсказывает класс еды на фото"""
+async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not food_model.is_trained:
         await update.message.reply_text(
             "❌ Модель ещё не обучена!\n"
@@ -161,15 +160,11 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_keyboard
         )
         return
+    await update.message.reply_text("📸 Пришлите фото еды для добавления в датасет")
+    return PHOTO
 
-    # Проверяем, есть ли фото в сообщении
-    if not update.message.photo:
-        await update.message.reply_text(
-            "📸 Пришлите фото еды для распознавания!",
-            reply_markup=main_keyboard
-        )
-        return
-
+async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Предсказывает класс еды на фото"""
     try:
         user_id = update.effective_user.id
         photo = update.message.photo[-1]
@@ -208,6 +203,7 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ Ошибка при распознавании: {str(e)}",
             reply_markup=main_keyboard
         )
+        return ConversationHandler.END
 
 
 # Добавляем команду для обучения модели
@@ -305,6 +301,7 @@ def main():
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
             SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
             #ADD_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_product_and_calories_per_hundread)]
+            PHOTO: [MessageHandler(filters.PHOTO, handle_photo_message)],
 
         },
         fallbacks=[CommandHandler('cancel', cancel)]
