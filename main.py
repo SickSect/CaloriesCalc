@@ -1,16 +1,16 @@
 import os
-from contextvars import Context
 from datetime import datetime
 
 from dotenv import load_dotenv
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, MessageHandler, filters, ContextTypes, \
     ConversationHandler
-from db import Database
+
+from bot.db import Database
+
 from ml.dataset_collector import DataCollector
 from ml.dataset_init import init_database
 from ml.food_model import FoodModel
-from str_utils import print_daily_report, init_product_table, print_product_info
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -59,6 +59,7 @@ async def handle_start_button(update: Update,  context: ContextTypes.DEFAULT_TYP
 
 async def handle_info_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     list = db.get_products_info()
+    from bot.str_utils import print_product_info
     await update.message.reply_text(print_product_info(list), reply_markup=main_keyboard)
 
 async def handle_today_calories(update: Update,  context: ContextTypes.DEFAULT_TYPE):
@@ -69,6 +70,7 @@ async def handle_today_calories(update: Update,  context: ContextTypes.DEFAULT_T
     else:
         report = db.get_today_calories(user_id)
         if report is not None:
+            from bot.str_utils import print_daily_report
             await update.message.reply_text( f"{print_daily_report(report)}", reply_markup=main_keyboard)
         elif report is None:
             await update.message.reply_text( "Сегодня калории не записаны", reply_markup=main_keyboard)
@@ -303,6 +305,7 @@ def main():
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
             SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
             #ADD_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_product_and_calories_per_hundread)]
+
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
@@ -312,5 +315,5 @@ def main():
 if __name__ == "__main__":
     db.init_db()
     print("DB initialized...")
-    init_database(data_collector)
+    #init_database(data_collector)
     main()

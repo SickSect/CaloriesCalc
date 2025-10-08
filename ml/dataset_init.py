@@ -1,4 +1,5 @@
 import os
+import re
 
 food_mapping = {
         # Пример: имя_файла -> продукт
@@ -9,6 +10,10 @@ food_mapping = {
         'cucumber': 'огурец',
         'tomato': 'помидор',
         'carrot': 'морковь',
+        'pumpkin': 'тыква',
+        'puree': 'пюре',
+        'cutlet': 'котлета',
+        'bell pepper': 'болгарский перец',
         'potato': 'картофель',
         'onion': 'лук',
         'cabbage': 'капуста',
@@ -16,12 +21,14 @@ food_mapping = {
         'chicken': 'курица',
         'beef': 'говядина',
         'pork': 'свинина',
+        'steak': 'стейк',
         'fish': 'рыба',
         'eggs': 'яйца',
         'cheese': 'сыр',
         'milk': 'молоко',
         'yogurt': 'йогурт',
-        'bread': 'хлеб',
+        'bread white': 'хлеб белый',
+        'bread black': 'хлеб черный',
         'rice': 'рис',
         'buckwheat': 'гречка',
         'pasta': 'макароны'
@@ -56,9 +63,13 @@ def init_database(collector):
             # Пытаемся определить продукт по имени файла
             file_key = os.path.splitext(filename)[0].lower()
             file_key_array = file_key.split('_')
+            file_key = ''
             for word in file_key_array:
-                if
-            food_name = None
+                if not re.findall(r'\d+', word):
+                    file_key += word
+                file_key += ' '
+            file_key = file_key.lstrip()
+            file_key = file_key.rstrip()
 
             # Ищем точное совпадение
             if file_key in food_mapping:
@@ -101,12 +112,6 @@ def init_database(collector):
     print(f"✅ Успешно добавлено: {added_count} изображений")
     print(f"❌ Пропущено: {skipped_count} изображений")
     print(f"📈 Всего в базе: {stats['total_images']} изображений")
-    print(f"🍎 Уникальных продуктов: {len(stats['by_food'])}")
-
-    if stats['by_food']:
-        print("\n📋 Добавленные продукты:")
-        for food, count in stats['by_food'].items():
-            print(f"  • {food}: {count} фото")
 
     # Проверяем возможность обучения
     if stats['can_train']:

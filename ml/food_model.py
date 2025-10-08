@@ -86,7 +86,7 @@ class FoodModel:
 
         return model.to(self.device)
 
-    def train(self, data_collector, epochs=10, batch_size=8):
+    def train(self, data_collector, epochs=5, batch_size=8):
         """Обучает модель на собранных данных"""
         print("🎯 Начинаем обучение модели...")
 

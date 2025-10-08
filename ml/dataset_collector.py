@@ -1,12 +1,9 @@
 import io
 import sqlite3
 import os
-import shutil
 from datetime import datetime
 
-
 from PIL import Image
-import numpy as np
 
 class DataCollector:
     def __init__(self):
@@ -15,6 +12,16 @@ class DataCollector:
         self.db_path = os.path.join(self.ml_dir, "food_dataset.db")
         self.images_dir = os.path.join(self.ml_dir, "collected_images")
 
+        # Список конкретных продуктов (будем расширять)
+        self.specific_foods = [
+            'огурец', 'помидор', 'яблоко', 'банан', 'апельсин', 'груша', 'тыква', 'лимон',
+            'морковь', 'картофель', 'лук', 'чеснок', 'капуста', 'салат',
+            'курица', 'говядина', 'свинина', 'рыба', 'яйца', 'сыр',
+            'хлеб белый', 'хлеб черный', 'булка',
+            'пицца', 'бургер', 'суп', 'борщ', 'котлета', 'стейк', 'пюре',
+            'молоко', 'кефир', 'йогурт', 'творог', 'сметана',
+            'рис', 'гречка', 'макароны', 'оладьи', 'блины', 'болгарский перец'
+        ]
         # Создаём папки
         os.makedirs(self.images_dir, exist_ok=True)
         # Подключаем базу
@@ -23,6 +30,25 @@ class DataCollector:
         print(f"📊 Сборщик данных инициализирован")
         print(f"📁 Папка изображений: {self.images_dir}")
         print(f"📁 База данных: {self.db_path}")
+
+    def extract_specific_food(self, description):
+        """Извлекает конкретный продукт из описания пользователя"""
+        description_lower = description.lower()
+
+        # Ищем точные совпадения с нашим списком продуктов
+        for food in self.specific_foods:
+            if food in description_lower:
+                return food
+
+        # Если точного совпадения нет, ищем по корням слов
+        import re
+        words = re.findall(r'\b[а-я]+\b', description_lower)
+        for word in words:
+            for food in self.specific_foods:
+                if food.startswith(word[:3]) and len(word) >= 3:  # Совпадение по первым 3 буквам
+                    return food
+
+        return "неизвестно"
 
     def create_tables(self):
         """Создаёт таблицы для датасета"""
@@ -89,9 +115,9 @@ class DataCollector:
         # Сохраняем в базу
         self.conn.execute('''
                     INSERT INTO food_images 
-                    (image_path, user_description, specific_food, user_id) 
-                    VALUES (?, ?, ?, ?)
-                ''', (image_path, desc, specific_food, user_id))
+                    (image_path, user_description, predicted_class, verified, user_id, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (image_path, desc, specific_food, True, user_id, datetime.now()))
         self.conn.commit()
 
         print(f"✅ Данные сохранены: {filename} -> {specific_food}")
@@ -117,6 +143,7 @@ class DataCollector:
 
     def get_labeled_data(self, min_confidence=0.6):
         """Возвращает размеченные данные для обучения"""
+        self.conn = sqlite3.connect(self.db_path)
         cursor = self.conn.cursor()
         cursor.execute('''
             SELECT image_path, predicted_class 
@@ -128,6 +155,7 @@ class DataCollector:
 
     def get_stats(self):
         """Статистика датасета"""
+        self.conn = sqlite3.connect(self.db_path)
         cursor = self.conn.cursor()
 
         # Общее количество
@@ -144,7 +172,7 @@ class DataCollector:
 
         # Для обучения
         trainable = len(self.get_labeled_data())
-
+        self.close()
         return {
             'total_images': total,
             'by_class': by_class,
@@ -152,6 +180,7 @@ class DataCollector:
             'can_train': trainable >= 20,  # Минимум 20 образцов
             'images_dir': self.images_dir
         }
+
 
     def get_training_status(self):
         """Статус для обучения"""
