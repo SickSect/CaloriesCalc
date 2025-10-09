@@ -161,10 +161,12 @@ async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
     await update.message.reply_text("📸 Пришлите фото еды для добавления в датасет")
+    print("Ожидание фото...")
     return PHOTO
 
 async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Предсказывает класс еды на фото"""
+    print("Получили фото. Начинается распознавание...")
     try:
         user_id = update.effective_user.id
         photo = update.message.photo[-1]
@@ -224,7 +226,7 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("🎯 Начинаем обучение модели... Это займёт несколько минут.")
 
         # Обучаем модель
-        success = food_model.train(data_collector, epochs=15)
+        success = food_model.train(data_collector, epochs=5)
 
         if success:
             response = (
@@ -288,21 +290,21 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Распознать еду" + "$"), predict_food))
+
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Обучить модель" + "$"), train_model_command))
 
     calories_conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),
-            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup)],
+            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup),
+            MessageHandler(filters.TEXT & filters.Regex("^" + "Распознать еду" + "$"), start_predict_food)],
             #MessageHandler(filters.TEXT & filters.Regex("^Калорийность продуктов$"), get_product_info)],
         states={
             SET_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories)],
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
             SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
             #ADD_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_product_and_calories_per_hundread)]
-            PHOTO: [MessageHandler(filters.PHOTO, handle_photo_message)],
-
+            PHOTO: [MessageHandler(~filters.PHOTO, predict_food)],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
@@ -312,5 +314,5 @@ def main():
 if __name__ == "__main__":
     db.init_db()
     print("DB initialized...")
-    #init_database(data_collector)
+    init_database(data_collector)
     main()
