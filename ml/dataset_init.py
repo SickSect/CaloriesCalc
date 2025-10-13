@@ -37,7 +37,9 @@ food_mapping = {
 def init_database(collector):
     """Инициализирует базу данных и заполняет её готовыми изображениями"""
     print("🗄️ Инициализация базы данных...")
-
+    if os.path.exists(os.path.join(os.path.dirname(__file__), "food_dataset.db")):
+        print("База данных была проинициализирована!")
+        return
     # Путь к папке с готовыми изображениями
     images_folder = os.path.join(os.path.dirname(__file__), "food_image")
     if not os.path.exists(images_folder):

@@ -290,21 +290,17 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))
-
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Обучить модель" + "$"), train_model_command))
-
     calories_conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),
             MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup),
             MessageHandler(filters.TEXT & filters.Regex("^" + "Распознать еду" + "$"), start_predict_food)],
-            #MessageHandler(filters.TEXT & filters.Regex("^Калорийность продуктов$"), get_product_info)],
         states={
             SET_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories)],
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
             SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
-            #ADD_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_product_and_calories_per_hundread)]
-            PHOTO: [MessageHandler(~filters.PHOTO, predict_food)],
+            PHOTO: [MessageHandler(filters.PHOTO, predict_food)],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
