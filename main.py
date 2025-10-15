@@ -315,8 +315,8 @@ def main():
 if __name__ == "__main__":
     db.init_db()
     if data_loader.absent_list:
-        download_absent_data_for_classes(data_loader.absent_list, limit_downloaded_train_images)
+        new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
     else:
         download_train_data_for_classes(limit_downloaded_train_images)
-    init_database(data_collector)
+        init_database(data_collector)
     main()

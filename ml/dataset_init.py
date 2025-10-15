@@ -36,6 +36,12 @@ food_mapping = {
         'pasta': 'макароны'
     }
 
+def add_files_to_database(new_files_dict, collector):
+    image_dict = {}
+    for key, filename in new_files_dict.items():
+        # дореализовать логику
+
+
 def init_database(collector):
     """Инициализирует базу данных и заполняет её готовыми изображениями"""
     print("🗄️ Инициализация базы данных...")
@@ -45,7 +51,7 @@ def init_database(collector):
     images_folder = os.path.join(os.path.dirname(__file__), "downloaded_images")
     if not os.path.exists(images_folder):
         print(f"❌ Папка с изображениями не найдена: {images_folder}")
-        print("📁 Создайте папку ml/food_images и положите туда изображения")
+        print("📁 Создайте папку ml/downloaded_images и положите туда изображения")
         return
 
     image_dict = {}

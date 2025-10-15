@@ -18,7 +18,8 @@ def download_train_data_for_classes(limit):
         )
         print(f"✅ Скачивание завершено! Изображения сохранены в папке: {images_folder}/{product}")
 
-def download_absent_data_for_classes(absent_dict, limit):
+def download_absent_data_for_classes(absent_dict):
+    new_files_dict = {}
     for product, amount in absent_dict.items():
         downloader.download(
             product,
@@ -29,3 +30,6 @@ def download_absent_data_for_classes(absent_dict, limit):
             timeout=10
         )
         print(f"✅ Данные были обновлены! Изображения сохранены в папке: {images_folder}/{product}")
+        for i in range(amount):
+            new_files_dict[product] = os.path.join(images_folder, f"Image_{i}")
+    return new_files_dict
