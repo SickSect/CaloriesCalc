@@ -51,65 +51,38 @@ def init_database(collector):
     image_dict = {}
     for key in product_lists:
         category_path = os.path.join(images_folder, key)
-
-    # Список файлов в папке
-    image_files = [f for f in os.listdir(images_folder)
+        # Список файлов в папке
+        image_files = [f for f in os.listdir(category_path)
                     if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+        if not image_files:
+            print(f"❌ В папке {images_folder} нет изображений по классу {key}")
+            print(f"📸 Добавьте изображения продуктов в формате JPG, PNG или BMP в класс {key}")
+        print(f"📁 Найдено {len(image_files)} изображений в папке по классу {key}")
+        added_count = 0
+        skipped_count = 0
+        image_dict[key] = image_files
 
-    if not image_files:
-        print(f"❌ В папке {images_folder} нет изображений")
-        print("📸 Добавьте изображения продуктов в формате JPG, PNG или BMP")
-        return
-
-    print(f"📁 Найдено {len(image_files)} изображений в папке")
-    added_count = 0
-    skipped_count = 0
-
-    for filename in image_files:
+    for key, files in image_dict.items():
         try:
-            # Пытаемся определить продукт по имени файла
-            file_key = os.path.splitext(filename)[0].lower()
-            file_key_array = file_key.split('_')
-            file_key = ''
-            for word in file_key_array:
-                if not re.findall(r'\d+', word):
-                    file_key += word
-                file_key += ' '
-            file_key = file_key.lstrip()
-            file_key = file_key.rstrip()
-
-            # Ищем точное совпадение
-            if file_key in food_mapping:
-                food_name = food_mapping[file_key]
-            else:
-                # Ищем частичное совпадение
-                for key, product in food_mapping.items():
-                    if key in file_key:
-                        food_name = product
-                        break
-
-            if not food_name:
-                # Если не нашли в mapping, используем имя файла как есть
-                food_name = file_key
-                print(f"⚠ Неизвестный продукт для файла {filename}, используем '{food_name}'")
-
+            food_name = key
             # Полный путь к файлу
-            file_path = os.path.join(images_folder, filename)
+            class_folder = os.path.join(images_folder, key)
+            print(f"Читаем папку: {class_folder}")
+            for file in files:
+                file_path = os.path.join(class_folder, file)
+                print(f"читаем файл: {file}")
+                # Читаем файл
+                with open(file_path, 'rb') as f:
+                    image_bytes = f.read()
 
-            # Читаем файл
-            with open(file_path, 'rb') as f:
-                image_bytes = f.read()
-
-            # Сохраняем в базу данных
-            saved_filename, detected_food = collector.save_food_image(
-                image_bytes, food_name, user_id=0  # user_id=0 для системных записей
-            )
-
-            print(f"✅ Добавлено: {filename} -> {detected_food}")
-            added_count += 1
-
+                # Сохраняем в базу данных
+                saved_filename, detected_food = collector.save_food_image(
+                    image_bytes, food_name, user_id=0  # user_id=0 для системных записей
+                )
+                print(f"    ✅ Добавлено: {file} -> {detected_food}")
+                added_count += 1
         except Exception as e:
-            print(f"❌ Ошибка при обработке {filename}: {e}")
+            print(f"    ❌ Ошибка при обработке {key}: {e}")
             skipped_count += 1
 
     # Получаем статистику

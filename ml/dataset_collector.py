@@ -75,6 +75,7 @@ class DataCollector:
         """Сохраняет фото еды в датасет, конвертируя в JPG если нужно"""
         # Уникальное имя файла
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        desc = str.replace(desc,' ', '_')
         filename = f"{desc}_{timestamp}_{user_id}.jpg"  # Всегда сохраняем как JPG
         image_path = os.path.join(self.images_dir, filename)
 
