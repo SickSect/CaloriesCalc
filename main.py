@@ -11,6 +11,7 @@ from bot.db import Database
 from ml.dataset_collector import DataCollector
 from ml.dataset_init import init_database
 from ml.food_model import FoodModel
+from ml.image_loader import download_train_data_for_classes
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -226,7 +227,7 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("🎯 Начинаем обучение модели... Это займёт несколько минут.")
 
         # Обучаем модель
-        success = food_model.train(data_collector, epochs=5)
+        success = food_model.train(data_collector, epochs=25)
 
         if success:
             response = (
@@ -309,6 +310,6 @@ def main():
 
 if __name__ == "__main__":
     db.init_db()
-    print("DB initialized...")
+    download_train_data_for_classes()
     init_database(data_collector)
     main()

@@ -5,6 +5,9 @@ from datetime import datetime
 
 from PIL import Image
 
+from ml.product_lists import product_lists
+
+
 class DataCollector:
     def __init__(self):
         # сохраняем пути
@@ -13,15 +16,7 @@ class DataCollector:
         self.images_dir = os.path.join(self.ml_dir, "collected_images")
 
         # Список конкретных продуктов (будем расширять)
-        self.specific_foods = [
-            'огурец', 'помидор', 'яблоко', 'банан', 'апельсин', 'груша', 'тыква', 'лимон',
-            'морковь', 'картофель', 'лук', 'чеснок', 'капуста', 'салат',
-            'курица', 'говядина', 'свинина', 'рыба', 'яйца', 'сыр',
-            'хлеб белый', 'хлеб черный', 'булка',
-            'пицца', 'бургер', 'суп', 'борщ', 'котлета', 'стейк', 'пюре',
-            'молоко', 'кефир', 'йогурт', 'творог', 'сметана',
-            'рис', 'гречка', 'макароны', 'оладьи', 'блины', 'болгарский перец'
-        ]
+        self.specific_foods = product_lists
         # Создаём папки
         os.makedirs(self.images_dir, exist_ok=True)
         # Подключаем базу
@@ -80,7 +75,7 @@ class DataCollector:
         """Сохраняет фото еды в датасет, конвертируя в JPG если нужно"""
         # Уникальное имя файла
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        filename = f"{timestamp}_{user_id}.jpg"  # Всегда сохраняем как JPG
+        filename = f"{desc}_{timestamp}_{user_id}.jpg"  # Всегда сохраняем как JPG
         image_path = os.path.join(self.images_dir, filename)
 
         try:
@@ -122,24 +117,6 @@ class DataCollector:
 
         print(f"✅ Данные сохранены: {filename} -> {specific_food}")
         return filename, specific_food
-
-    def _predict_class_from_text(self, description):
-        """Простая эвристика для определения класса из текста"""
-        description_lower = description.lower()
-
-        # Простые правила - потом заменим на ML модель
-        if any(word in description_lower for word in ['фрукт', 'яблоко', 'банан', 'апельсин', 'груш']):
-            return 'фрукты'
-        elif any(word in description_lower for word in ['овощ', 'салат', 'морков', 'помидор', 'огур']):
-            return 'овощи'
-        elif any(word in description_lower for word in ['мясо', 'куриц', 'говядин', 'свинин', 'рыба']):
-            return 'мясо_рыба'
-        elif any(word in description_lower for word in ['выпечка', 'хлеб', 'булка', 'пирог', 'торт']):
-            return 'выпечка'
-        elif any(word in description_lower for word in ['суп', 'борщ', 'щи', 'бульон']):
-            return 'супы'
-        else:
-            return 'другое'
 
     def get_labeled_data(self, min_confidence=0.6):
         """Возвращает размеченные данные для обучения"""

@@ -6,6 +6,8 @@ import torch.nn as nn
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
+from ml.product_lists import product_lists, product_classes_idx
+
 
 class FoodDataset(Dataset):
     """Датасет для обучения на собранных фото"""
@@ -14,7 +16,7 @@ class FoodDataset(Dataset):
         self.image_paths = image_paths
         self.labels = labels
         self.transform = transform
-        self.class_to_idx = {'фрукты': 0, 'овощи': 1, 'мясо_рыба': 2, 'выпечка': 3, 'супы': 4, 'другое': 5}
+        self.class_to_idx = product_classes_idx
 
     def __len__(self):
         return len(self.image_paths)
@@ -47,22 +49,17 @@ class FoodModel:
         print(f"📱 Устройство: {self.device}")
 
         # Классы (совпадают с DataCollector)
-        self.class_names = [
-            'огурец', 'помидор', 'яблоко', 'банан', 'апельсин', 'груша', 'тыква', 'лимон',
-            'морковь', 'картофель', 'лук', 'чеснок', 'капуста', 'салат',
-            'курица', 'говядина', 'свинина', 'рыба', 'яйца', 'сыр',
-            'хлеб белый', 'хлеб черный', 'булка',
-            'пицца', 'бургер', 'суп', 'борщ', 'котлета', 'стейк', 'пюре',
-            'молоко', 'кефир', 'йогурт', 'творог', 'сметана',
-            'рис', 'гречка', 'макароны', 'оладьи', 'блины', 'болгарский перец'
-        ]
+        self.class_names = product_lists
         self.class_to_idx = {name: i for i, name in enumerate(self.class_names)}
 
         # Трансформации
         self.train_transform = transforms.Compose([
-            transforms.Resize((224, 224)),
+            transforms.Resize((256, 256)),
+            transforms.RandomCrop((224,224)),
             transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(10),
+            transforms.RandomRotation(25),
+            transforms.ColorJitter(0.3, 0.3, 0.3, 0.1),
+            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
@@ -87,10 +84,12 @@ class FoodModel:
     def _create_model(self):
         """Создаёт модель с предобученными весами"""
         model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
-
+        for param in model.parameters():
+            param.requires_grad = False
 
         num_features = model.classifier[1].in_features
-        model.classifier[1] = nn.Linear(num_features, len(self.class_names))
+        classes_amount = len(self.class_names)
+        model.classifier[1] = nn.Linear(num_features, classes_amount)
 
         return model.to(self.device)
 

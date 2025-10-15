@@ -1,6 +1,8 @@
 import os
 import re
 
+from ml.product_lists import product_lists
+
 food_mapping = {
         # Пример: имя_файла -> продукт
         'apple': 'яблоко',
@@ -39,13 +41,16 @@ def init_database(collector):
     print("🗄️ Инициализация базы данных...")
     if os.path.exists(os.path.join(os.path.dirname(__file__), "food_dataset.db")):
         print("База данных была проинициализирована!")
-        return
     # Путь к папке с готовыми изображениями
-    images_folder = os.path.join(os.path.dirname(__file__), "food_image")
+    images_folder = os.path.join(os.path.dirname(__file__), "downloaded_images")
     if not os.path.exists(images_folder):
         print(f"❌ Папка с изображениями не найдена: {images_folder}")
         print("📁 Создайте папку ml/food_images и положите туда изображения")
         return
+
+    image_dict = {}
+    for key in product_lists:
+        category_path = os.path.join(images_folder, key)
 
     # Список файлов в папке
     image_files = [f for f in os.listdir(images_folder)
