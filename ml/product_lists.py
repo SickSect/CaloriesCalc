@@ -1,74 +1,17 @@
-product_lists = [
-            'апельсин',
-            'болгарский перец',
-            'говядина',
-            'гречка',
-            'котлета',
-            'курица',
-            'лимон',
-            'макароны',
-            'огурец',
-            'помидор',
-            'пюре',
-            'салат',
-            'тыква',
-            'хлеб белый',
-            'хлеб черный'
-]
+import json
+import os.path
 
-product_classes_idx = {
-            'апельсин' : 0,
-            'болгарский перец' : 1,
-            'говядина' : 2,
-            'гречка' : 3,
-            'котлета' : 4,
-            'курица' : 5,
-            'лимон' : 6,
-            'макароны' : 7,
-            'огурец' : 8,
-            'помидор' : 9,
-            'пюре' : 10,
-            'салат' : 11,
-            'тыква' : 12,
-            'хлеб белый' : 13,
-            'хлеб черный' : 14
-}
+product_lists = []
+product_classes_idx = {}
+food_mapping = {}
 
-food_mapping = {
-        # Пример: имя_файла -> продукт
-        'apple': 'яблоко',
-        'banana': 'банан',
-        'lemon': 'лимон',
-        'orange': 'апельсин',
-        'cucumber': 'огурец',
-        'tomato': 'помидор',
-        'carrot': 'морковь',
-        'pumpkin': 'тыква',
-        'puree': 'пюре',
-        'cutlet': 'котлета',
-        'bell pepper': 'болгарский перец',
-        'potato': 'картофель',
-        'onion': 'лук',
-        'cabbage': 'капуста',
-        'lettuce': 'салат',
-        'chicken': 'курица',
-        'beef': 'говядина',
-        'pork': 'свинина',
-        'steak': 'стейк',
-        'fish': 'рыба',
-        'eggs': 'яйца',
-        'cheese': 'сыр',
-        'milk': 'молоко',
-        'yogurt': 'йогурт',
-        'bread white': 'хлеб белый',
-        'bread black': 'хлеб черный',
-        'rice': 'рис',
-        'buckwheat': 'гречка',
-        'pasta': 'макароны'
-    }
-
-def fill_list_on_init(ru_list, eng_list):
-    for ru, eng in ru_list.items(), eng_list.items():
+def fill_list_on_init():
+    json_path = os.path.join(os.path.dirname(__file__), 'products.json')
+    with open(json_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    ru_list = config['products_ru']
+    en_list = config['products_en']
+    for ru, eng in zip(ru_list, en_list):
         food_mapping[eng] = ru
     tmp = 0
     for product in ru_list:
@@ -76,3 +19,29 @@ def fill_list_on_init(ru_list, eng_list):
         tmp += 1
     for product in ru_list:
         product_lists.append(product)
+    print(f"Проинициализированы необходимые словари и списки для работы:\nproduct_lists: {product_lists} \nproduct_classes_idx:{product_classes_idx}\nfood_mapping:{food_mapping}")
+
+class DataLoader:
+    def __init__(self, limit):
+        json_path = os.path.join(os.path.dirname(__file__), 'products.json')
+        with open(json_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        ru_list = config['products_ru']
+        en_list = config['products_en']
+        for ru, eng in zip(ru_list, en_list):
+            food_mapping[eng] = ru
+        self.ru_list = ru_list
+        self.en_list = en_list
+        # Проверить что файлы уже возможно существуют в папках
+        images_folder_path = os.path.join(os.path.dirname(__file__), "downloaded_images")
+        self.absent_list = {}
+        for product in ru_list:
+            product_dir_path = os.path.join(images_folder_path, product)
+            num_files = len(os.listdir(product_dir_path))
+            if num_files == 0:
+                print(f"В папке нет файлов по классу {product}")
+                self.absent_list[product] = limit
+            elif num_files < limit:
+                print(f"В папке не хватает {limit - num_files} файлов по классу {product}")
+                self.absent_list[product] = limit - num_files
+            print(f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")

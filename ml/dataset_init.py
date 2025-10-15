@@ -49,6 +49,8 @@ def init_database(collector):
         return
 
     image_dict = {}
+    added_count = 0
+    skipped_count = 0
     for key in product_lists:
         category_path = os.path.join(images_folder, key)
         # Список файлов в папке
@@ -58,8 +60,7 @@ def init_database(collector):
             print(f"❌ В папке {images_folder} нет изображений по классу {key}")
             print(f"📸 Добавьте изображения продуктов в формате JPG, PNG или BMP в класс {key}")
         print(f"📁 Найдено {len(image_files)} изображений в папке по классу {key}")
-        added_count = 0
-        skipped_count = 0
+
         image_dict[key] = image_files
 
     for key, files in image_dict.items():

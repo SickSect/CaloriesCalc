@@ -11,13 +11,16 @@ from bot.db import Database
 from ml.dataset_collector import DataCollector
 from ml.dataset_init import init_database
 from ml.food_model import FoodModel
-from ml.image_loader import download_train_data_for_classes
+from ml.image_loader import download_train_data_for_classes, download_absent_data_for_classes
+from ml.product_lists import fill_list_on_init, DataLoader
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
 food_model = FoodModel()
 data_collector = DataCollector()
+limit_downloaded_train_images = 50
+data_loader = DataLoader(limit_downloaded_train_images)
 
 start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
@@ -284,6 +287,7 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
             "❌ Не удалось сохранить фото. Попробуйте ещё раз.",
             reply_markup=main_keyboard
         )
+
 # --- Запуск бота ---
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -310,6 +314,9 @@ def main():
 
 if __name__ == "__main__":
     db.init_db()
-    download_train_data_for_classes()
+    if data_loader.absent_list:
+        download_absent_data_for_classes(data_loader.absent_list, limit_downloaded_train_images)
+    else:
+        download_train_data_for_classes(limit_downloaded_train_images)
     init_database(data_collector)
     main()
