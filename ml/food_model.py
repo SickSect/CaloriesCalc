@@ -96,28 +96,22 @@ class FoodModel:
     def train(self, data_collector, epochs=5, batch_size=8):
         """Обучает модель на собранных данных"""
         print("🎯 Начинаем обучение модели...")
-
         # Получаем данные для обучения
         labeled_data = data_collector.get_labeled_data()
-
         if len(labeled_data) < 10:
             print(f"❌ Недостаточно данных: {len(labeled_data)} образцов (нужно минимум 10)")
             return False
-
         # Разделяем на пути и метки
         image_paths, labels = zip(*labeled_data)
-
         # Создаём датасет и загрузчик
         dataset = FoodDataset(image_paths, labels, transform=self.train_transform)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-
         # Оптимизатор и функция потерь
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         criterion = nn.CrossEntropyLoss()
 
         # Обучение
         self.model.train()
-
         for epoch in range(epochs):
             total_loss = 0
             correct = 0

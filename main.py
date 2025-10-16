@@ -9,17 +9,17 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
 from bot.db import Database
 
 from ml.dataset_collector import DataCollector
-from ml.dataset_init import init_database
+from ml.dataset_init import init_database, add_files_to_database
 from ml.food_model import FoodModel
 from ml.image_loader import download_train_data_for_classes, download_absent_data_for_classes
-from ml.product_lists import fill_list_on_init, DataLoader
+from ml.data_loader import fill_list_on_init, DataLoader, get_json_config
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
 food_model = FoodModel()
 data_collector = DataCollector()
-limit_downloaded_train_images = 50
+limit_downloaded_train_images = get_json_config("product_limit")
 data_loader = DataLoader(limit_downloaded_train_images)
 
 start_keyboard = ReplyKeyboardMarkup(
@@ -254,20 +254,15 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
         user_id = update.effective_user.id
         photo = update.message.photo[-1]
         file = await context.bot.get_file(photo.file_id)
-
         caption = update.message.caption or "Фото еды"
-
         # Скачиваем фото
         image_bytes = await file.download_as_bytearray()
-
         # Сохраняем в датасет
         filename, predicted_class = data_collector.save_food_image(
             bytes(image_bytes), caption, user_id
         )
-
         # Статистика
         stats = data_collector.get_stats()
-
         response = (
             f"📸 Фото сохранено в датасет!\n"
             f"📝 Описание: '{caption}'\n"
@@ -275,10 +270,8 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
             f"📊 Всего собрано: {stats['total_images']} фото\n"
             f"🎯 Готово для обучения: {stats['trainable_samples']} фото"
         )
-
         if stats['can_train'] and not food_model.is_trained:
             response += "\n\n✅ Достаточно данных для обучения модели!"
-
         await update.message.reply_text(response, reply_markup=main_keyboard)
 
     except Exception as e:
@@ -306,6 +299,7 @@ def main():
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
             SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
             PHOTO: [MessageHandler(filters.PHOTO, predict_food)],
+            ConversationHandler.END: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_main_keyboard)]
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
@@ -316,6 +310,7 @@ if __name__ == "__main__":
     db.init_db()
     if data_loader.absent_list:
         new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
+        add_files_to_database(new_files_dict, data_collector)
     else:
         download_train_data_for_classes(limit_downloaded_train_images)
         init_database(data_collector)

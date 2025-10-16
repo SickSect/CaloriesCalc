@@ -37,9 +37,15 @@ food_mapping = {
     }
 
 def add_files_to_database(new_files_dict, collector):
-    image_dict = {}
     for key, filename in new_files_dict.items():
-        # дореализовать логику
+        for path in filename:
+            with open(path, 'rb') as f:
+                image_bytes = f.read()
+            # Сохраняем в базу данных
+            saved_filename, detected_food = collector.save_food_image(
+                image_bytes, key, user_id=0  # user_id=0 для системных записей
+            )
+            print(f"    ✅ Добавлено: {saved_filename} -> {detected_food}")
 
 
 def init_database(collector):

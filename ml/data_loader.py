@@ -5,12 +5,15 @@ product_lists = []
 product_classes_idx = {}
 food_mapping = {}
 
-def fill_list_on_init():
+def get_json_config(param):
     json_path = os.path.join(os.path.dirname(__file__), 'products.json')
     with open(json_path, "r", encoding="utf-8") as f:
         config = json.load(f)
-    ru_list = config['products_ru']
-    en_list = config['products_en']
+    return config[param]
+
+def fill_list_on_init():
+    ru_list = get_json_config('products_ru')
+    en_list = get_json_config('products_en')
     for ru, eng in zip(ru_list, en_list):
         food_mapping[eng] = ru
     tmp = 0
