@@ -6,7 +6,7 @@ import torch.nn as nn
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
-from ml.product_lists import product_lists, product_classes_idx
+from ml.data_loader import product_lists, product_classes_idx
 
 
 class FoodDataset(Dataset):

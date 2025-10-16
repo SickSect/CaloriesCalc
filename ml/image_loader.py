@@ -1,7 +1,7 @@
 import os
 from bing_image_downloader import downloader
 
-from ml.product_lists import product_lists
+from ml.data_loader import product_lists
 
 
 images_folder = os.path.join(os.path.dirname(__file__), "downloaded_images")

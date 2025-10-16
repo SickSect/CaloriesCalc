@@ -1,40 +1,7 @@
 import os
 import re
 
-from ml.product_lists import product_lists
-
-food_mapping = {
-        # Пример: имя_файла -> продукт
-        'apple': 'яблоко',
-        'banana': 'банан',
-        'lemon': 'лимон',
-        'orange': 'апельсин',
-        'cucumber': 'огурец',
-        'tomato': 'помидор',
-        'carrot': 'морковь',
-        'pumpkin': 'тыква',
-        'puree': 'пюре',
-        'cutlet': 'котлета',
-        'bell pepper': 'болгарский перец',
-        'potato': 'картофель',
-        'onion': 'лук',
-        'cabbage': 'капуста',
-        'lettuce': 'салат',
-        'chicken': 'курица',
-        'beef': 'говядина',
-        'pork': 'свинина',
-        'steak': 'стейк',
-        'fish': 'рыба',
-        'eggs': 'яйца',
-        'cheese': 'сыр',
-        'milk': 'молоко',
-        'yogurt': 'йогурт',
-        'bread white': 'хлеб белый',
-        'bread black': 'хлеб черный',
-        'rice': 'рис',
-        'buckwheat': 'гречка',
-        'pasta': 'макароны'
-    }
+from ml.data_loader import product_lists
 
 def add_files_to_database(new_files_dict, collector):
     for key, filename in new_files_dict.items():

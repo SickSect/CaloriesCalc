@@ -39,12 +39,16 @@ class DataLoader:
         images_folder_path = os.path.join(os.path.dirname(__file__), "downloaded_images")
         self.absent_list = {}
         for product in ru_list:
-            product_dir_path = os.path.join(images_folder_path, product)
-            num_files = len(os.listdir(product_dir_path))
-            if num_files == 0:
+            if os.path.exists(os.path.join(images_folder_path, product)):
+                product_dir_path = os.path.join(images_folder_path, product)
+                num_files = len(os.listdir(product_dir_path))
+                if num_files == 0:
+                    print(f"В папке нет файлов по классу {product}")
+                    self.absent_list[product] = limit
+                elif num_files < limit:
+                    print(f"В папке не хватает {limit - num_files} файлов по классу {product}")
+                    self.absent_list[product] = limit - num_files
+                print(f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")
+            else:
                 print(f"В папке нет файлов по классу {product}")
                 self.absent_list[product] = limit
-            elif num_files < limit:
-                print(f"В папке не хватает {limit - num_files} файлов по классу {product}")
-                self.absent_list[product] = limit - num_files
-            print(f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")
