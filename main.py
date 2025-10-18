@@ -308,10 +308,12 @@ def main():
 
 if __name__ == "__main__":
     db.init_db()
-    if data_loader.absent_list:
+    fill_list_on_init()
+    exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
+    if len(data_loader.absent_list) > 0 and exist_dataset_db:
         new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
         add_files_to_database(new_files_dict, data_collector)
-    else:
+    elif not exist_dataset_db:
         download_train_data_for_classes(limit_downloaded_train_images)
         init_database(data_collector)
     main()

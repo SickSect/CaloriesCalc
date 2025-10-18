@@ -31,5 +31,5 @@ def download_absent_data_for_classes(absent_dict):
         )
         print(f"✅ Данные были обновлены! Изображения сохранены в папке: {images_folder}/{product}")
         for i in range(amount):
-            new_files_dict[product] = os.path.join(images_folder, f"Image_{i}")
+            new_files_dict[product] = f"Image_{i}"
     return new_files_dict

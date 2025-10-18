@@ -4,7 +4,9 @@ import re
 from ml.data_loader import product_lists
 
 def add_files_to_database(new_files_dict, collector):
+    current_dir = os.path.dirname(os.path.realpath(__file__))
     for key, filename in new_files_dict.items():
+        category_dir = os.path.join(current_dir, key)
         for path in filename:
             with open(path, 'rb') as f:
                 image_bytes = f.read()
@@ -16,7 +18,7 @@ def add_files_to_database(new_files_dict, collector):
 
 
 def init_database(collector):
-    """Инициализирует базу данных и заполняет её готовыми изображениями"""
+    """Инициализирует базу данных и  заполняет её готовыми изображениями"""
     print("🗄️ Инициализация базы данных...")
     if os.path.exists(os.path.join(os.path.dirname(__file__), "food_dataset.db")):
         print("База данных была проинициализирована!")
