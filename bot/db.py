@@ -118,7 +118,7 @@ class Database:
                 user_uuid = str(uuid.uuid4())
                 old_calories = row[0]
                 order_id = row[1]
-                print("Save new note:", [old_calories + today_calories, product_name, order_id + 1, telegram_id, current_date])
+                log('info',"Save new note:", [old_calories + today_calories, product_name, order_id + 1, telegram_id, current_date])
                 result = cursor.execute("INSERT INTO user_calories_history (id, telegram_id, todays_calories, product_name, order_id, date) VALUES (?, ?, ?, ?, ?, ?)",
                                         (user_uuid, telegram_id, old_calories + today_calories, product_name, order_id + 1, current_date))
             else:

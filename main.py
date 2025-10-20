@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 
@@ -7,6 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 
 from bot.db import Database
+from log.log_writer import log
 
 from ml.dataset_collector import DataCollector
 from ml.dataset_init import init_database, add_files_to_database
@@ -21,6 +23,8 @@ food_model = FoodModel()
 data_collector = DataCollector()
 limit_downloaded_train_images = get_json_config("product_limit")
 data_loader = DataLoader(limit_downloaded_train_images)
+logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level = os.getenv('LOG_LEVEL'))
+
 
 start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
@@ -165,12 +169,12 @@ async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
     await update.message.reply_text("📸 Пришлите фото еды для добавления в датасет")
-    print("Ожидание фото...")
+    log('info',"Ожидание фото...")
     return PHOTO
 
 async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Предсказывает класс еды на фото"""
-    print("Получили фото. Начинается распознавание...")
+    log('info',"Получили фото. Начинается распознавание...")
     try:
         user_id = update.effective_user.id
         photo = update.message.photo[-1]
@@ -275,7 +279,7 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(response, reply_markup=main_keyboard)
 
     except Exception as e:
-        print(f"❌ Ошибка сохранения фото: {e}")
+        log('info', f"❌ Ошибка сохранения фото: {e}")
         await update.message.reply_text(
             "❌ Не удалось сохранить фото. Попробуйте ещё раз.",
             reply_markup=main_keyboard
@@ -284,7 +288,7 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
 # --- Запуск бота ---
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    print("Bot is starting...")
+    log('info',"Bot is starting...")
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))

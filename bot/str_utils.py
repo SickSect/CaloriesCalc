@@ -39,14 +39,14 @@ def print_daily_report(products: list[tuple[str, int]]):
     return report
 
 def print_product_info( products: list[tuple[str,int]]):
-    print("\n" + "=" * 50 + "\n")
-    print("📋  Сводная таблица продуктов (ккал на 100г)".center(50) + "\n")
-    print("=" * 50 + "\n")
+    log('info',"\n" + "=" * 50 + "\n")
+    log('info',"📋  Сводная таблица продуктов (ккал на 100г)".center(50) + "\n")
+    log('info',"=" * 50 + "\n")
 
     for i, (name, cal) in enumerate(products.items(), 1):
-        print(f"{i:>2}. {name:<25} | {cal:>4} ккал " + "\n")
+        log('info',f"{i:>2}. {name:<25} | {cal:>4} ккал " + "\n")
 
-    print("=" * 50 + "\n" + "\n")
+    log('info',"=" * 50 + "\n" + "\n")
 
 def init_product_table(db : Database):
     for p, (name, calories) in enumerate(PRODUCTS_DB.items(), 1):
