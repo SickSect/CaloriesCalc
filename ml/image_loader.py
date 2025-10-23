@@ -1,6 +1,7 @@
 import os
 import threading
 
+from PIL import Image
 from bing_image_downloader import downloader
 
 from log.log_writer import log
@@ -10,7 +11,7 @@ from ml.data_loader import product_lists
 images_folder = os.path.join(os.path.dirname(__file__), "downloaded_images")
 lock = threading.Lock()
 keys = product_lists
-num_threads = os.cpu_count() // 2
+num_threads = 1
 
 def download_train_data_for_classes(limit):
     threads = []
@@ -22,6 +23,23 @@ def download_train_data_for_classes(limit):
 
     for t in threads:
         t.join()
+
+def validate_images():
+    log('info', f'Начинаем валидацию изображений по ключам {keys}...')
+    for key in keys:
+        for root, _, files in os.walk(key):
+            print(f'find {files}')
+    #for root, _, files in os.walk('downloaded_images'):
+    #    for f in files:
+    #        if f.lower().endswith(('.jpg', '.jpeg', '.png', '.tiff', '.bmp', '.webp')):
+    #            path = os.path.join(root, f)
+    #            try:
+    #                with Image.open(path) as img:
+    #                    img.verify()  # не грузит в память, но проверяет целостность
+    #                print(f"Проверили файл: {path}")
+    #            except Exception as e:
+    #                print(f"❌ Битый файл: {path} ({e})")
+    #                os.remove(path)
 
 def multithread_downloading(limit):
     log('debug',f"В работе поток  ----->{threading.get_ident()}")

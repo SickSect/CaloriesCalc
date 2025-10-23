@@ -7,16 +7,16 @@ from ml.data_loader import product_lists
 def add_files_to_database(new_files_dict, collector):
     current_dir = os.path.dirname(os.path.realpath(__file__))
     for key, filename in new_files_dict.items():
-        category_dir = os.path.join(current_dir, key)
         for path in filename:
             with open(path, 'rb') as f:
                 image_bytes = f.read()
             # Сохраняем в базу данных
-            saved_filename, detected_food = collector.save_food_image(
+            detected_food = collector.save_food_image(
+                path,
+                image_bytes,
                 image_bytes, key, user_id=0  # user_id=0 для системных записей
             )
-            log('info',f"    ✅ Добавлено: {saved_filename} -> {detected_food}")
-
+            log('info',f"    ✅ Добавлено: {filename} -> {detected_food}")
 
 def init_database(collector):
     """Инициализирует базу данных и заполняет её готовыми изображениями"""
@@ -38,6 +38,7 @@ def init_database(collector):
         # Список файлов в папке
         image_files = [f for f in os.listdir(category_path)
                     if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+        # TODO надо добавить валидациб файлов было, часть битые блин!
         if not image_files:
             log('error',f"❌ В папке {images_folder} нет изображений по классу {key}")
             log('error',f"📸 Добавьте изображения продуктов в формате JPG, PNG или BMP в класс {key}")
@@ -59,7 +60,8 @@ def init_database(collector):
                     image_bytes = f.read()
 
                 # Сохраняем в базу данных
-                saved_filename, detected_food = collector.save_food_image(
+                detected_food = collector.save_food_image(
+                    file_path,
                     image_bytes, food_name, user_id=0  # user_id=0 для системных записей
                 )
                 log('debug',f"✅ Добавлено: {file} -> {detected_food}")

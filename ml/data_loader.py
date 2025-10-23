@@ -24,7 +24,7 @@ def fill_list_on_init():
         tmp += 1
     for product in ru_list:
         product_lists.append(product)
-    log('debug',f"Проинициализированы необходимые словари и списки для работы:\nproduct_lists: {product_lists} \nproduct_classes_idx:{product_classes_idx}\nfood_mapping:{food_mapping}")
+    log('info',f"Проинициализированы необходимые словари и списки для работы:\nproduct_lists: {product_lists} \nproduct_classes_idx:{product_classes_idx}\nfood_mapping:{food_mapping}")
 
 class DataLoader:
     def __init__(self, limit):

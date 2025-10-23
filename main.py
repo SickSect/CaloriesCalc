@@ -13,18 +13,17 @@ from log.log_writer import log
 from ml.dataset_collector import DataCollector
 from ml.dataset_init import init_database, add_files_to_database
 from ml.food_model import FoodModel
-from ml.image_loader import download_train_data_for_classes, download_absent_data_for_classes
+from ml.image_loader import download_train_data_for_classes, download_absent_data_for_classes, validate_images
 from ml.data_loader import fill_list_on_init, DataLoader, get_json_config
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
+fill_list_on_init()
 food_model = FoodModel()
 data_collector = DataCollector()
 limit_downloaded_train_images = get_json_config("product_limit")
 data_loader = DataLoader(limit_downloaded_train_images)
-logging.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level = os.getenv('LOG_LEVEL'))
-
 
 start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
@@ -234,7 +233,7 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("🎯 Начинаем обучение модели... Это займёт несколько минут.")
 
         # Обучаем модель
-        success = food_model.train(data_collector, epochs=25)
+        success = food_model.train(data_collector, epochs=10)
 
         if success:
             response = (
@@ -262,7 +261,7 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
         # Скачиваем фото
         image_bytes = await file.download_as_bytearray()
         # Сохраняем в датасет
-        filename, predicted_class = data_collector.save_food_image(
+        predicted_class = data_collector.save_food_image(
             bytes(image_bytes), caption, user_id
         )
         # Статистика
@@ -312,12 +311,15 @@ def main():
 
 if __name__ == "__main__":
     db.init_db()
-    fill_list_on_init()
+    validate_images()
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
+    count_rows_food_dataset = data_collector.get_stats()
     if len(data_loader.absent_list) > 0 and exist_dataset_db:
         new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
         add_files_to_database(new_files_dict, data_collector)
     elif not exist_dataset_db:
         download_train_data_for_classes(limit_downloaded_train_images)
+        init_database(data_collector)
+    elif exist_dataset_db and count_rows_food_dataset['total_images'] == 0:
         init_database(data_collector)
     main()
