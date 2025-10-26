@@ -54,7 +54,7 @@ def init_database(collector):
             log('info',f"Читаем папку: {class_folder}")
             for file in files:
                 file_path = os.path.join(class_folder, file)
-                log('info',f"читаем файл: {file}")
+                log('debug',f"читаем файл: {file}")
                 # Читаем файл
                 with open(file_path, 'rb') as f:
                     image_bytes = f.read()

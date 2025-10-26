@@ -26,20 +26,23 @@ def download_train_data_for_classes(limit):
 
 def validate_images():
     log('info', f'Начинаем валидацию изображений по ключам {keys}...')
+    num_deleted = 0
+    num_success = 0
     for key in keys:
-        for root, _, files in os.walk(key):
-            print(f'find {files}')
-    #for root, _, files in os.walk('downloaded_images'):
-    #    for f in files:
-    #        if f.lower().endswith(('.jpg', '.jpeg', '.png', '.tiff', '.bmp', '.webp')):
-    #            path = os.path.join(root, f)
-    #            try:
-    #                with Image.open(path) as img:
-    #                    img.verify()  # не грузит в память, но проверяет целостность
-    #                print(f"Проверили файл: {path}")
-    #            except Exception as e:
-    #                print(f"❌ Битый файл: {path} ({e})")
-    #                os.remove(path)
+        log('info', f'Проверка файлов по ключу: {key}')
+        for root, _, files in os.walk(os.path.join(images_folder, key)):
+            for file in files:
+                path = os.path.join(root, file)
+                try:
+                    with Image.open(path) as img:
+                        img.verify()
+                    log('debug', f'Файл проверен: {path} его режим цвета {img.mode}')
+                    num_success += 1
+                except Exception as e:
+                    log('error', f'❌ Битый файл: {path} {e}')
+                    os.remove(path)
+                    num_deleted += 1
+    log('info', f'Проверка завершена!\n Удалено файлов{num_deleted}, успешно проверенных файлов {num_success}')
 
 def multithread_downloading(limit):
     log('debug',f"В работе поток  ----->{threading.get_ident()}")

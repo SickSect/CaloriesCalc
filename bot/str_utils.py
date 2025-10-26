@@ -1,4 +1,5 @@
 from db import Database
+from log.log_writer import log
 
 PRODUCTS_DB = {
     "Хлеб (пшеничный)": 265,

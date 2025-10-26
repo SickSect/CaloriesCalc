@@ -157,7 +157,7 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
     except ValueError:
         await update.message.reply_text("Ошибка, повторите ввод:",
                                         reply_markup=cancel_keyboard)
-        return SET_TODAY_CALORIES
+        return SET_PRODUCT_NAME
 
 async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not food_model.is_trained:
@@ -197,12 +197,6 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"• Уверенность: {result['confidence']}%\n"
                 f"• {result['message']}"
             )
-
-            # Показываем все вероятности
-            if 'all_probabilities' in result:
-                response += "\n\n📊 Все вероятности:\n"
-                for cls, prob in result['all_probabilities'].items():
-                    response += f"• {cls}: {prob}%\n"
         else:
             response = f"❌ Ошибка: {result['error']}"
 
@@ -212,7 +206,7 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ Ошибка при распознавании: {str(e)}",
             reply_markup=main_keyboard
         )
-        return ConversationHandler.END
+    return ConversationHandler.END
 
 
 # Добавляем команду для обучения модели
@@ -301,19 +295,23 @@ def main():
             SET_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories)],
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
             SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
-            PHOTO: [MessageHandler(filters.PHOTO, predict_food)],
-            ConversationHandler.END: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_main_keyboard)]
+            PHOTO: [MessageHandler(filters.PHOTO, predict_food)]
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel)],
+        allow_reentry=True
     )
     app.add_handler(calories_conv_handler)
     app.run_polling()
 
 if __name__ == "__main__":
     db.init_db()
-    validate_images()
+    # Существует ли обученная модель
+    exist_model = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/trained_model.pth"))
+    # Существует ли бд с данными
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
     count_rows_food_dataset = data_collector.get_stats()
+    if not exist_model:
+        validate_images()
     if len(data_loader.absent_list) > 0 and exist_dataset_db:
         new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
         add_files_to_database(new_files_dict, data_collector)

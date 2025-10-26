@@ -6,7 +6,7 @@ import torchvision.models as models
 import os
 import numpy as np
 import torch.nn as nn
-from PIL import Image, ImageFile
+from PIL import Image, ImageFile, UnidentifiedImageError
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 from log.log_writer import log
@@ -36,22 +36,24 @@ class FoodDataset(Dataset):
         try:
             with Image.open(self.image_paths[idx]) as img:
                 img.load()
-                image = img.convert('RGB')
-            #image = Image.open(self.image_paths[idx]).convert('RGB')
-            label_name = self.labels[idx]
-            label = self.class_to_idx[label_name]
+                mode_type = img.mode
+                if mode_type != 'RGB':
+                    image = img.convert('RGB')
+                else:
+                    image = img
+            label = self.labels[idx]
             if self.transform:
                 image = self.transform(image)
-
             return image, label
+        except UnidentifiedImageError:
+            log('error', f"❌ Не удалось открыть (неизвестный формат): {self.image_paths[idx]}")
+            return None, 5  # Класс 'другое'
+        except OSError as e:
+            log('error',f"⚠️ Ошибка чтения {self.image_paths[idx]}: {e}")
+            return None, 5  # Класс 'другое'
         except Exception as e:
-            # Возвращаем заглушку в случае ошибки
-            image = Image.new('RGB', (224, 224), color='gray')
-            print(f"⚠️ Ошибка с {self.image_paths[idx]}: {e}")
-            if self.transform:
-                image = self.transform(image)
-            return image, 5  # Класс 'другое'
-
+            log('error',f"⚠️ Неизвестная ошибка {self.image_paths[idx]}: {e}")
+            return None, 5  # Класс 'другое'
 
 class FoodModel:
     def __init__(self, food_classes = None):
