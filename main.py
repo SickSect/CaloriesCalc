@@ -8,6 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 
 from bot.db import Database
+from bot.str_utils import print_help_info
 from log.log_writer import log
 
 from ml.dataset_collector import DataCollector
@@ -30,12 +31,11 @@ start_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True)
 main_keyboard = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("Установить суточные калории")],
-        [KeyboardButton("Добавить калории")],
-        [KeyboardButton("Калории сегодня")],
-        [KeyboardButton("Добавить продукт и его калорийность")],
-        [KeyboardButton("Обучить модель")],
-        [KeyboardButton("Распознать еду")]
+        [KeyboardButton("📅 Установить суточные калории")],
+        [KeyboardButton("➕ Добавить калории")],
+        [KeyboardButton("🔥 Калории сегодня")],
+        [KeyboardButton("🧠 Обучить модель")],
+        [KeyboardButton("📸 Распознать еду")]
     ]
 )
 cancel_keyboard = ReplyKeyboardMarkup(
@@ -50,7 +50,7 @@ SET_CALORIES, ADD_PRODUCT, SET_TODAY_CALORIES, SET_PRODUCT_NAME, PHOTO = range(5
 # --- Обработка /start или любого первого сообщения
 async def start(update: Update, context: CallbackContext):
     reply_markup = start_keyboard
-    await update.message.reply_text("Приветствие", reply_markup=reply_markup)
+    await update.message.reply_text(print_help_info(), reply_markup=reply_markup)
 
 async def get_main_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = start_keyboard
