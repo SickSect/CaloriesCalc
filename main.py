@@ -8,7 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 
 from bot.db import Database
-from bot.str_utils import print_help_info
+from bot.str_utils import print_help_info, multiply_calories
 from log.log_writer import log
 
 from ml.dataset_collector import DataCollector
@@ -34,7 +34,8 @@ main_keyboard = ReplyKeyboardMarkup(
         [KeyboardButton("📅 Установить суточные калории")],
         [KeyboardButton("➕ Добавить калории")],
         [KeyboardButton("🔥 Калории сегодня")],
-        [KeyboardButton("🧠 Обучить модель")],
+        [KeyboardButton("🍗 Добавить продукт")],
+        #[KeyboardButton("🧠 Обучить модель")],
         [KeyboardButton("📸 Распознать еду")]
     ]
 )
@@ -45,7 +46,7 @@ cancel_keyboard = ReplyKeyboardMarkup(
 )
 
 # Определяем состояния диалога
-SET_CALORIES, ADD_PRODUCT, SET_TODAY_CALORIES, SET_PRODUCT_NAME, PHOTO = range(5)
+SET_CALORIES, ADD_PRODUCT, SET_PRODUCT_WEIGHT, SET_TODAY_CALORIES, SET_PRODUCT_CALORIES_PER_HUNDRED, SET_PRODUCT_NAME, PHOTO, SET_NEW_PRODUCT_CALORIES, SAVE_NEW_PRODUCT = range(9)
 
 # --- Обработка /start или любого первого сообщения
 async def start(update: Update, context: CallbackContext):
@@ -90,7 +91,7 @@ async def cancel(update, context):
         "Операция отменена",
         reply_markup=main_keyboard
     )
-    return ConversationHandler.END
+    return
 
 async def start_calories_setup(update, context):
     """Начинает процесс установки калорий"""
@@ -103,16 +104,40 @@ async def start_calories_setup(update, context):
 async def start_today_calories_setup(update, context):
     """Начинает процесс добавления калорий на сегодня"""
     await update.message.reply_text(
-        "Пожалуйста, введите количество калорий:",
+        "Пожалуйста, введите название продукта:",
         reply_markup=cancel_keyboard
     )
-    return SET_TODAY_CALORIES
+    return SET_PRODUCT_NAME
 
 async def start_product_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Пожалуйста, введите название продукта:",
         reply_markup=cancel_keyboard
     )
+    return SET_PRODUCT_NAME
+
+async def start_new_product_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Пожалуйста, введите название продукта:",
+        reply_markup=cancel_keyboard
+    )
+    return SET_NEW_PRODUCT_CALORIES
+
+async def start_new_product_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    product_name_input = update.message.text
+    context.user_data["product_name_input"] = product_name_input
+    await update.message.reply_text(
+        "Пожалуйста, введите количество калорий на 100 грамм продукта:",
+        reply_markup=cancel_keyboard)
+    return SAVE_NEW_PRODUCT
+
+async def save_new_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    product_calories_input = update.message.text
+    context.user_data["product_calories_input"] = product_calories_input
+    db.add_product(context.user_data["product_name_input"], context.user_data["product_calories_input"])
+    await update.message.reply_text(
+        "Успешно сохранено",
+        reply_markup=main_keyboard)
     return
 
 async def set_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -131,33 +156,55 @@ async def set_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пожалуйста, введите число:", reply_markup=cancel_keyboard)
         return SET_CALORIES
 
+async def set_calories_per_hundred(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    calories_per_hundred_input = update.message.text.strip()
+    context.user_data["today_calories"] = calories_per_hundred_input
+    await update.message.reply_text(f"Калорийность указанного продукта: {calories_per_hundred_input}, мы добавили это в расписание калорий")
+    db.add_calories_for_today(update.effective_user.id, calories_per_hundred_input, context.user_data["product_name"])
+    return
+
+async def set_product_weight(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text_input = update.message.text.strip()
+    context.user_data["product_weight"] = text_input
+    weight_calories = multiply_calories(float(context.user_data["calories_per_hundred"]), float(context.user_data["product_weight"]))
+    db.add_calories_for_today(update.effective_user.id, weight_calories, context.user_data["product_name"])
+    await update.message.reply_text(f"Добавлена запись:\n калорийность {weight_calories} продукта {context.user_data['product_name']}",
+                                    reply_markup=main_keyboard)
+    return
+
 async def set_product_name(update, context: ContextTypes.DEFAULT_TYPE):
     text_input = update.message.text.strip()
     try:
         if len(str(text_input)) > 60:
             raise ValueError("Название продукта не может быть длиннее 60 символов")
+            return
         context.user_data["product_name"] = text_input
-        db.add_calories_for_today(update.effective_user.id, context.user_data["today_calories"],
-                                  context.user_data["product_name"])
-    except ValueError:
-        await update.message.reply_text("Повторите ввод, вдруг ваше название длинее 60 символов",
+        await update.message.reply_text("Поиск продукта в заметках...",
                                         reply_markup=cancel_keyboard)
+        if db.check_product_exists(text_input):
+            product_info = db.get_product_info(text_input)
+            await update.message.reply_text(f"Найден продукт: {product_info[2]} с калорийностью {product_info[1]}\n\nВведите вес продукта в граммах:",
+                                            reply_markup=cancel_keyboard)
+            context.user_data["calories_per_hundred"] = product_info[1]
+            return SET_PRODUCT_WEIGHT
+        else:
+            await update.message.reply_text(f"Продукт не найден. Введите его калорийность на 100 грамм:",
+                                            reply_markup=cancel_keyboard)
+            return SET_TODAY_CALORIES
+    except ValueError:
+        await update.message.reply_text("Повторите ввод, вдруг ваше название длиннее 60 символов",
+                                        reply_markup=cancel_keyboard)
+        return
 
-    return ConversationHandler.END
 
 async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает ввод калорий за сегодняшний день"""
-    try:
-        calories = int(update.message.text.strip())
-        context.user_data["today_calories"] = calories
-        await update.message.reply_text(
-            "Пожалуйста, введите название продукта:"
-        )
-        return SET_PRODUCT_NAME
-    except ValueError:
-        await update.message.reply_text("Ошибка, повторите ввод:",
-                                        reply_markup=cancel_keyboard)
-        return SET_PRODUCT_NAME
+    product_calories_per_hundred = update.message.text.strip()
+    context.user_data["calories_per_hundred"] = product_calories_per_hundred
+    await update.message.reply_text(f"Введите вес продукта:",
+                                    reply_markup=cancel_keyboard)
+    return SET_PRODUCT_WEIGHT
+
 
 async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not food_model.is_trained:
@@ -208,7 +255,6 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     return ConversationHandler.END
 
-
 # Добавляем команду для обучения модели
 async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обучает модель на собранных данных"""
@@ -243,7 +289,6 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             response = "❌ Не удалось обучить модель. Попробуйте позже."
 
     await update.message.reply_text(response, reply_markup=main_keyboard)
-
 
 async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет фото еды для обучения модели"""
@@ -284,17 +329,22 @@ def main():
     log('info',"Bot is starting...")
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Обучить модель" + "$"), train_model_command))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "🔥 Калории сегодня" + "$"), handle_today_calories))
+    #app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Обучить модель" + "$"), train_model_command))
     calories_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),
-            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup),
-            MessageHandler(filters.TEXT & filters.Regex("^" + "Распознать еду" + "$"), start_predict_food)],
+            MessageHandler(filters.TEXT & filters.Regex("^📅 Установить суточные калории$"), start_calories_setup),
+            MessageHandler(filters.TEXT & filters.Regex("^➕ Добавить калории$"), start_today_calories_setup),
+            MessageHandler(filters.TEXT & filters.Regex("^📸 Распознать еду$"), start_predict_food),
+            MessageHandler(filters.TEXT & filters.Regex("^🍗 Добавить продукт$"), start_new_product_adding)],
         states={
             SET_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories)],
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
             SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
+            SET_PRODUCT_CALORIES_PER_HUNDRED: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories_per_hundred)],
+            SET_NEW_PRODUCT_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, start_new_product_calories)],
+            SAVE_NEW_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_new_product)],
+            SET_PRODUCT_WEIGHT: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_weight)],
             PHOTO: [MessageHandler(filters.PHOTO, predict_food)]
         },
         fallbacks=[CommandHandler('cancel', cancel)],

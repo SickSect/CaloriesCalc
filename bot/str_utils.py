@@ -1,4 +1,7 @@
 from log.log_writer import log
+import pymorphy3
+
+morph = pymorphy3.MorphAnalyzer(lang='ru')
 
 def print_daily_report(products: list[tuple[str, int]]):
     total = sum(cal for _, cal in products)
@@ -25,6 +28,12 @@ def print_product_info( products: list[tuple[str,int]]):
 
     log('info',"=" * 50 + "\n" + "\n")
 
+def get_lemma_word(word):
+    return morph.parse(word)[0].normal_form
+
+def multiply_calories(calories_per_hundred, product_weight):
+    calories = (product_weight * calories_per_hundred) / 100
+    return calories
 
 def print_help_info():
     return f'''👋 Привет!
