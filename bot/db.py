@@ -2,6 +2,9 @@ import datetime
 import sqlite3
 import uuid
 
+from bot.str_utils import get_lemma_word
+from log.log_writer import log
+
 
 class Database:
     def __init__(self, db_path: str = "bot_database.db"):
@@ -24,7 +27,7 @@ class Database:
                         CREATE TABLE IF NOT EXISTS products (
                         id TEXT PRIMARY KEY NOT NULL,
                         calories_per_hundread INTEGER NOT NULL,
-                        product_name TEXT NOT NULL
+                        product_name TEXT NOT NULL UNIQUE
                     )
             ''')
 
@@ -62,12 +65,30 @@ class Database:
     def check_user_exists(self, telegram_id):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM calories_config WHERE telegram_id=?", (telegram_id,))
+            cursor.execute("SELECT * FROM calories_config WHERE telegram_id=$1", [telegram_id])
             row = cursor.fetchone()
             conn.commit()
             if row:
                 return True
             return False
+
+    def check_product_exists(self, product_name):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM products WHERE product_name=$1", [product_name])
+            row = cursor.fetchone()
+            conn.commit()
+            if row:
+                return True
+            return False
+
+    def get_product_info(self, product_name):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM products WHERE product_name=$1", [product_name])
+            row = cursor.fetchone()
+            conn.commit()
+            return row
 
     def get_today_calories(self, telegram_id):
         current_date = datetime.date.today()
@@ -83,19 +104,33 @@ class Database:
             else:
                 return None
 
-
-
     def set_daily_calories(self, telegram_id, daily_calories):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             result = cursor.execute("UPDATE calories_config SET daily_calories = $1 where telegram_id=$2", [daily_calories, telegram_id])
             conn.commit()
 
-    def add_product(self, product_name: str, calories_per_hundread: int):
+    def add_product(self, product_name: str, calories_per_hundred: int):
+        lemma_product_name = get_lemma_word(product_name)
+        if not self.check_product_exists(lemma_product_name):
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO products (id, "
+                               "calories_per_hundread, "
+                               "product_name) VALUES (?,?,?)", (str(uuid.uuid4()), calories_per_hundred, lemma_product_name))
+                conn.commit()
+                return True
+        else:
+            return False
+
+
+    def get_through_lemma_calories_product(self, product_name):
+        lemma_product_name = get_lemma_word(product_name)
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO products (id, calories_per_hundread, product_name) VALUES (?,?,?)", (str(uuid.uuid4()), calories_per_hundread, product_name))
-            conn.commit()
+            cursor.execute("SELECT calories_per_hundread FROM products WHERE product_name=?", (product_name,))
+            result = cursor.fetchone()
+        return result
 
     def get_products_info(self):
         with sqlite3.connect(self.db_path) as conn:
@@ -118,7 +153,7 @@ class Database:
                 user_uuid = str(uuid.uuid4())
                 old_calories = row[0]
                 order_id = row[1]
-                print("Save new note:", [old_calories + today_calories, product_name, order_id + 1, telegram_id, current_date])
+                log('info',"Save new note:", [old_calories + today_calories, product_name, order_id + 1, telegram_id, current_date])
                 result = cursor.execute("INSERT INTO user_calories_history (id, telegram_id, todays_calories, product_name, order_id, date) VALUES (?, ?, ?, ?, ?, ?)",
                                         (user_uuid, telegram_id, old_calories + today_calories, product_name, order_id + 1, current_date))
             else:

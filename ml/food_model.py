@@ -1,13 +1,19 @@
+import sys
+
 import torchvision.transforms as transforms
 import torch
 import torchvision.models as models
 import os
+import numpy as np
 import torch.nn as nn
-from PIL import Image
-from torch.utils.data import DataLoader, Dataset
+from PIL import Image, ImageFile, UnidentifiedImageError
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
+from log.log_writer import log
 from ml.data_loader import product_lists, product_classes_idx
 
+bar_length = 30
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 class FoodDataset(Dataset):
     """Датасет для обучения на собранных фото"""
@@ -17,40 +23,52 @@ class FoodDataset(Dataset):
         self.labels = labels
         self.transform = transform
         self.class_to_idx = product_classes_idx
+        self.length = len(labels)
+        self.loaded = 0
 
     def __len__(self):
         return len(self.image_paths)
 
+    def iteration_loaded(self):
+        self.loaded += 1
+
     def __getitem__(self, idx):
         try:
-            image = Image.open(self.image_paths[idx]).convert('RGB')
-            label = self.class_to_idx.get(self.labels[idx], 5)  # 'другое' по умолчанию
-
+            with Image.open(self.image_paths[idx]) as img:
+                img.load()
+                mode_type = img.mode
+                if mode_type != 'RGB':
+                    image = img.convert('RGB')
+                else:
+                    image = img
+            label = self.labels[idx]
             if self.transform:
                 image = self.transform(image)
-
             return image, label
+        except UnidentifiedImageError:
+            log('error', f"❌ Не удалось открыть (неизвестный формат): {self.image_paths[idx]}")
+            return None, 5  # Класс 'другое'
+        except OSError as e:
+            log('error',f"⚠️ Ошибка чтения {self.image_paths[idx]}: {e}")
+            return None, 5  # Класс 'другое'
         except Exception as e:
-            # Возвращаем заглушку в случае ошибки
-            image = Image.new('RGB', (224, 224), color='gray')
-            if self.transform:
-                image = self.transform(image)
-            return image, 5  # Класс 'другое'
+            log('error',f"⚠️ Неизвестная ошибка {self.image_paths[idx]}: {e}")
+            return None, 5  # Класс 'другое'
 
 class FoodModel:
     def __init__(self, food_classes = None):
-        print("🚀 Инициализируем обучаемую модель...")
+        log('debug',"🚀 Инициализируем обучаемую модель...")
 
         self.ml_dir = os.path.dirname(os.path.abspath(__file__))
         self.model_path = os.path.join(self.ml_dir, "trained_model.pth")
 
         # Устройство
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"📱 Устройство: {self.device}")
+        log('debug',f"📱 Устройство: {self.device}")
 
         # Классы (совпадают с DataCollector)
         self.class_names = product_lists
-        self.class_to_idx = {name: i for i, name in enumerate(self.class_names)}
+        self.class_to_idx = product_classes_idx
 
         # Трансформации
         self.train_transform = transforms.Compose([
@@ -77,9 +95,9 @@ class FoodModel:
         # Пробуем загрузить обученную модель
         if os.path.exists(self.model_path):
             self.load_model()
-            print("✅ Загружена обученная модель")
+            log('debug',"✅ Загружена обученная модель")
         else:
-            print("🆕 Модель не обучена. Нужно собрать данные и обучить.")
+            log('error',"🆕 Модель не обучена. Нужно собрать данные и обучить.")
 
     def _create_model(self):
         """Создаёт модель с предобученными весами"""
@@ -93,19 +111,34 @@ class FoodModel:
 
         return model.to(self.device)
 
-    def train(self, data_collector, epochs=5, batch_size=8):
+    def train(self, data_collector, epochs=10, batch_size=8):
         """Обучает модель на собранных данных"""
-        print("🎯 Начинаем обучение модели...")
+        log('debug',"🎯 Начинаем обучение модели...")
         # Получаем данные для обучения
         labeled_data = data_collector.get_labeled_data()
         if len(labeled_data) < 10:
-            print(f"❌ Недостаточно данных: {len(labeled_data)} образцов (нужно минимум 10)")
+            log('error',f"❌ Недостаточно данных: {len(labeled_data)} образцов (нужно минимум 10)")
             return False
+
         # Разделяем на пути и метки
         image_paths, labels = zip(*labeled_data)
         # Создаём датасет и загрузчик
-        dataset = FoodDataset(image_paths, labels, transform=self.train_transform)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+        label_indices = []
+        for lbl in labels:
+            if lbl not in self.class_to_idx:
+                raise ValueError(f"Unknown label in dataset: {lbl}")
+            label_indices.append(self.class_to_idx.get(lbl))
+        dataset = FoodDataset(image_paths, label_indices, transform=self.train_transform)
+        class_sample_counts = np.bincount(label_indices)
+        class_weights = 1. / (class_sample_counts + 1e-6)
+        sample_weights = [class_weights[lbl] for lbl in label_indices]
+        # Создаём сэмплер
+        sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(sample_weights),  # сколько всего выборок за эпоху
+            replacement=True  # с повторениями, чтобы выравнивать классы
+        )
+        dataloader = DataLoader(dataset, batch_size=batch_size, sampler = sampler, num_workers=0)
         # Оптимизатор и функция потерь
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         criterion = nn.CrossEntropyLoss()
@@ -113,6 +146,9 @@ class FoodModel:
         # Обучение
         self.model.train()
         for epoch in range(epochs):
+            log('info',
+                f'📊 Эпоха [{epoch + 1}/{epochs}]...')
+
             total_loss = 0
             correct = 0
             total = 0
@@ -133,14 +169,14 @@ class FoodModel:
                 correct += (predicted == labels).sum().item()
 
             accuracy = 100 * correct / total
-            print(
-                f'📊 Эпоха [{epoch + 1}/{epochs}], Loss: {total_loss / len(dataloader):.4f}, Accuracy: {accuracy:.2f}%')
+            log('info',
+                f'📊 Эпоха [{epoch + 1}/{epochs}], \nLoss: {total_loss / len(dataloader):.4f}, \nAccuracy: {accuracy:.2f}%')
 
         # Сохраняем модель
         self.save_model()
         self.is_trained = True
 
-        print(f"✅ Обучение завершено! Обучено на {len(labeled_data)} образцах")
+        log('info',f"✅ Обучение завершено! Обучено на {len(labeled_data)} образцах")
         return True
 
     def predict(self, image_path):
@@ -192,7 +228,7 @@ class FoodModel:
             'class_names': self.class_names,
             'is_trained': True
         }, self.model_path)
-        print(f"💾 Модель сохранена: {self.model_path}")
+        log('info',f"💾 Модель сохранена: {self.model_path}")
 
     def load_model(self):
         """Загружает модель"""
@@ -203,7 +239,7 @@ class FoodModel:
             self.is_trained = checkpoint.get('is_trained', False)
             return True
         except Exception as e:
-            print(f"❌ Ошибка загрузки модели: {e}")
+            log('error',f"❌ Ошибка загрузки модели: {e}")
             return False
 
     def get_model_info(self):

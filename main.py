@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 
@@ -7,16 +8,19 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 
 from bot.db import Database
+from bot.str_utils import print_help_info, multiply_calories
+from log.log_writer import log
 
 from ml.dataset_collector import DataCollector
 from ml.dataset_init import init_database, add_files_to_database
 from ml.food_model import FoodModel
-from ml.image_loader import download_train_data_for_classes, download_absent_data_for_classes
+from ml.image_loader import download_train_data_for_classes, download_absent_data_for_classes, validate_images
 from ml.data_loader import fill_list_on_init, DataLoader, get_json_config
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
+fill_list_on_init()
 food_model = FoodModel()
 data_collector = DataCollector()
 limit_downloaded_train_images = get_json_config("product_limit")
@@ -27,12 +31,12 @@ start_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True)
 main_keyboard = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("Установить суточные калории")],
-        [KeyboardButton("Добавить калории")],
-        [KeyboardButton("Калории сегодня")],
-        [KeyboardButton("Добавить продукт и его калорийность")],
-        [KeyboardButton("Обучить модель")],
-        [KeyboardButton("Распознать еду")]
+        [KeyboardButton("📅 Установить суточные калории")],
+        [KeyboardButton("➕ Добавить калории")],
+        [KeyboardButton("🔥 Калории сегодня")],
+        [KeyboardButton("🍗 Добавить продукт")],
+        #[KeyboardButton("🧠 Обучить модель")],
+        [KeyboardButton("📸 Распознать еду")]
     ]
 )
 cancel_keyboard = ReplyKeyboardMarkup(
@@ -42,12 +46,12 @@ cancel_keyboard = ReplyKeyboardMarkup(
 )
 
 # Определяем состояния диалога
-SET_CALORIES, ADD_PRODUCT, SET_TODAY_CALORIES, SET_PRODUCT_NAME, PHOTO = range(5)
+SET_CALORIES, ADD_PRODUCT, SET_PRODUCT_WEIGHT, SET_TODAY_CALORIES, SET_PRODUCT_CALORIES_PER_HUNDRED, SET_PRODUCT_NAME, PHOTO, SET_NEW_PRODUCT_CALORIES, SAVE_NEW_PRODUCT = range(9)
 
 # --- Обработка /start или любого первого сообщения
 async def start(update: Update, context: CallbackContext):
     reply_markup = start_keyboard
-    await update.message.reply_text("Приветствие", reply_markup=reply_markup)
+    await update.message.reply_text(print_help_info(), reply_markup=reply_markup)
 
 async def get_main_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = start_keyboard
@@ -87,7 +91,7 @@ async def cancel(update, context):
         "Операция отменена",
         reply_markup=main_keyboard
     )
-    return ConversationHandler.END
+    return
 
 async def start_calories_setup(update, context):
     """Начинает процесс установки калорий"""
@@ -100,16 +104,40 @@ async def start_calories_setup(update, context):
 async def start_today_calories_setup(update, context):
     """Начинает процесс добавления калорий на сегодня"""
     await update.message.reply_text(
-        "Пожалуйста, введите количество калорий:",
+        "Пожалуйста, введите название продукта:",
         reply_markup=cancel_keyboard
     )
-    return SET_TODAY_CALORIES
+    return SET_PRODUCT_NAME
 
 async def start_product_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Пожалуйста, введите название продукта:",
         reply_markup=cancel_keyboard
     )
+    return SET_PRODUCT_NAME
+
+async def start_new_product_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Пожалуйста, введите название продукта:",
+        reply_markup=cancel_keyboard
+    )
+    return SET_NEW_PRODUCT_CALORIES
+
+async def start_new_product_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    product_name_input = update.message.text
+    context.user_data["product_name_input"] = product_name_input
+    await update.message.reply_text(
+        "Пожалуйста, введите количество калорий на 100 грамм продукта:",
+        reply_markup=cancel_keyboard)
+    return SAVE_NEW_PRODUCT
+
+async def save_new_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    product_calories_input = update.message.text
+    context.user_data["product_calories_input"] = product_calories_input
+    db.add_product(context.user_data["product_name_input"], context.user_data["product_calories_input"])
+    await update.message.reply_text(
+        "Успешно сохранено",
+        reply_markup=main_keyboard)
     return
 
 async def set_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -128,33 +156,55 @@ async def set_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пожалуйста, введите число:", reply_markup=cancel_keyboard)
         return SET_CALORIES
 
+async def set_calories_per_hundred(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    calories_per_hundred_input = update.message.text.strip()
+    context.user_data["today_calories"] = calories_per_hundred_input
+    await update.message.reply_text(f"Калорийность указанного продукта: {calories_per_hundred_input}, мы добавили это в расписание калорий")
+    db.add_calories_for_today(update.effective_user.id, calories_per_hundred_input, context.user_data["product_name"])
+    return
+
+async def set_product_weight(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text_input = update.message.text.strip()
+    context.user_data["product_weight"] = text_input
+    weight_calories = multiply_calories(float(context.user_data["calories_per_hundred"]), float(context.user_data["product_weight"]))
+    db.add_calories_for_today(update.effective_user.id, weight_calories, context.user_data["product_name"])
+    await update.message.reply_text(f"Добавлена запись:\n калорийность {weight_calories} продукта {context.user_data['product_name']}",
+                                    reply_markup=main_keyboard)
+    return
+
 async def set_product_name(update, context: ContextTypes.DEFAULT_TYPE):
     text_input = update.message.text.strip()
     try:
         if len(str(text_input)) > 60:
             raise ValueError("Название продукта не может быть длиннее 60 символов")
+            return
         context.user_data["product_name"] = text_input
-        db.add_calories_for_today(update.effective_user.id, context.user_data["today_calories"],
-                                  context.user_data["product_name"])
-    except ValueError:
-        await update.message.reply_text("Повторите ввод, вдруг ваше название длинее 60 символов",
+        await update.message.reply_text("Поиск продукта в заметках...",
                                         reply_markup=cancel_keyboard)
+        if db.check_product_exists(text_input):
+            product_info = db.get_product_info(text_input)
+            await update.message.reply_text(f"Найден продукт: {product_info[2]} с калорийностью {product_info[1]}\n\nВведите вес продукта в граммах:",
+                                            reply_markup=cancel_keyboard)
+            context.user_data["calories_per_hundred"] = product_info[1]
+            return SET_PRODUCT_WEIGHT
+        else:
+            await update.message.reply_text(f"Продукт не найден. Введите его калорийность на 100 грамм:",
+                                            reply_markup=cancel_keyboard)
+            return SET_TODAY_CALORIES
+    except ValueError:
+        await update.message.reply_text("Повторите ввод, вдруг ваше название длиннее 60 символов",
+                                        reply_markup=cancel_keyboard)
+        return
 
-    return ConversationHandler.END
 
 async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает ввод калорий за сегодняшний день"""
-    try:
-        calories = int(update.message.text.strip())
-        context.user_data["today_calories"] = calories
-        await update.message.reply_text(
-            "Пожалуйста, введите название продукта:"
-        )
-        return SET_PRODUCT_NAME
-    except ValueError:
-        await update.message.reply_text("Ошибка, повторите ввод:",
-                                        reply_markup=cancel_keyboard)
-        return SET_TODAY_CALORIES
+    product_calories_per_hundred = update.message.text.strip()
+    context.user_data["calories_per_hundred"] = product_calories_per_hundred
+    await update.message.reply_text(f"Введите вес продукта:",
+                                    reply_markup=cancel_keyboard)
+    return SET_PRODUCT_WEIGHT
+
 
 async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not food_model.is_trained:
@@ -165,12 +215,12 @@ async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
     await update.message.reply_text("📸 Пришлите фото еды для добавления в датасет")
-    print("Ожидание фото...")
+    log('info',"Ожидание фото...")
     return PHOTO
 
 async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Предсказывает класс еды на фото"""
-    print("Получили фото. Начинается распознавание...")
+    log('info',"Получили фото. Начинается распознавание...")
     try:
         user_id = update.effective_user.id
         photo = update.message.photo[-1]
@@ -194,12 +244,6 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"• Уверенность: {result['confidence']}%\n"
                 f"• {result['message']}"
             )
-
-            # Показываем все вероятности
-            if 'all_probabilities' in result:
-                response += "\n\n📊 Все вероятности:\n"
-                for cls, prob in result['all_probabilities'].items():
-                    response += f"• {cls}: {prob}%\n"
         else:
             response = f"❌ Ошибка: {result['error']}"
 
@@ -209,8 +253,7 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ Ошибка при распознавании: {str(e)}",
             reply_markup=main_keyboard
         )
-        return ConversationHandler.END
-
+    return ConversationHandler.END
 
 # Добавляем команду для обучения модели
 async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -230,7 +273,7 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("🎯 Начинаем обучение модели... Это займёт несколько минут.")
 
         # Обучаем модель
-        success = food_model.train(data_collector, epochs=25)
+        success = food_model.train(data_collector, epochs=10)
 
         if success:
             response = (
@@ -247,7 +290,6 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await update.message.reply_text(response, reply_markup=main_keyboard)
 
-
 async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет фото еды для обучения модели"""
     try:
@@ -258,7 +300,7 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
         # Скачиваем фото
         image_bytes = await file.download_as_bytearray()
         # Сохраняем в датасет
-        filename, predicted_class = data_collector.save_food_image(
+        predicted_class = data_collector.save_food_image(
             bytes(image_bytes), caption, user_id
         )
         # Статистика
@@ -275,7 +317,7 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(response, reply_markup=main_keyboard)
 
     except Exception as e:
-        print(f"❌ Ошибка сохранения фото: {e}")
+        log('info', f"❌ Ошибка сохранения фото: {e}")
         await update.message.reply_text(
             "❌ Не удалось сохранить фото. Попробуйте ещё раз.",
             reply_markup=main_keyboard
@@ -284,36 +326,48 @@ async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYP
 # --- Запуск бота ---
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    print("Bot is starting...")
+    log('info',"Bot is starting...")
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Начать" + "$"), handle_start_button))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Калории сегодня" + "$"), handle_today_calories))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Обучить модель" + "$"), train_model_command))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "🔥 Калории сегодня" + "$"), handle_today_calories))
+    #app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^" + "Обучить модель" + "$"), train_model_command))
     calories_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.TEXT & filters.Regex("^Установить суточные калории$"), start_calories_setup),
-            MessageHandler(filters.TEXT & filters.Regex("^Добавить калории$"), start_today_calories_setup),
-            MessageHandler(filters.TEXT & filters.Regex("^" + "Распознать еду" + "$"), start_predict_food)],
+            MessageHandler(filters.TEXT & filters.Regex("^📅 Установить суточные калории$"), start_calories_setup),
+            MessageHandler(filters.TEXT & filters.Regex("^➕ Добавить калории$"), start_today_calories_setup),
+            MessageHandler(filters.TEXT & filters.Regex("^📸 Распознать еду$"), start_predict_food),
+            MessageHandler(filters.TEXT & filters.Regex("^🍗 Добавить продукт$"), start_new_product_adding)],
         states={
             SET_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories)],
             SET_TODAY_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_calories_for_today)],
             SET_PRODUCT_NAME:[MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_name)],
-            PHOTO: [MessageHandler(filters.PHOTO, predict_food)],
-            ConversationHandler.END: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_main_keyboard)]
+            SET_PRODUCT_CALORIES_PER_HUNDRED: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_calories_per_hundred)],
+            SET_NEW_PRODUCT_CALORIES: [MessageHandler(filters.TEXT & ~filters.COMMAND, start_new_product_calories)],
+            SAVE_NEW_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_new_product)],
+            SET_PRODUCT_WEIGHT: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_product_weight)],
+            PHOTO: [MessageHandler(filters.PHOTO, predict_food)]
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel)],
+        allow_reentry=True
     )
     app.add_handler(calories_conv_handler)
     app.run_polling()
 
 if __name__ == "__main__":
     db.init_db()
-    fill_list_on_init()
+    # Существует ли обученная модель
+    exist_model = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/trained_model.pth"))
+    # Существует ли бд с данными
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
+    count_rows_food_dataset = data_collector.get_stats()
+    if not exist_model:
+        validate_images()
     if len(data_loader.absent_list) > 0 and exist_dataset_db:
         new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
         add_files_to_database(new_files_dict, data_collector)
     elif not exist_dataset_db:
         download_train_data_for_classes(limit_downloaded_train_images)
+        init_database(data_collector)
+    elif exist_dataset_db and count_rows_food_dataset['total_images'] == 0:
         init_database(data_collector)
     main()

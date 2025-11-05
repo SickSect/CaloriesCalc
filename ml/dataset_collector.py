@@ -5,6 +5,7 @@ from datetime import datetime
 
 from PIL import Image
 
+from log.log_writer import log
 from ml.data_loader import product_lists
 
 
@@ -22,9 +23,9 @@ class DataCollector:
         # Подключаем базу
         self.conn = sqlite3.connect(self.db_path)
         self.create_tables()
-        print(f"📊 Сборщик данных инициализирован")
-        print(f"📁 Папка изображений: {self.images_dir}")
-        print(f"📁 База данных: {self.db_path}")
+        log('debug',f"📊 Сборщик данных инициализирован")
+        log('debug',f"📁 Папка изображений: {self.images_dir}")
+        log('debug',f"📁 База данных: {self.db_path}")
 
     def extract_specific_food(self, description):
         """Извлекает конкретный продукт из описания пользователя"""
@@ -71,18 +72,13 @@ class DataCollector:
         ''')
         self.conn.commit()
 
-    def save_food_image(self, image_bytes, desc, user_id, predicted_class=None, confidence=0):
+    def save_food_image(self, path, image_bytes, desc, user_id, predicted_class=None, confidence=0):
+        self.conn = sqlite3.connect(self.db_path)
         """Сохраняет фото еды в датасет, конвертируя в JPG если нужно"""
-        # Уникальное имя файла
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        desc = str.replace(desc,' ', '_')
-        filename = f"{desc}_{timestamp}_{user_id}.jpg"  # Всегда сохраняем как JPG
-        image_path = os.path.join(self.images_dir, filename)
-
+        image_path = os.path.join(self.images_dir, path)
         try:
             # Открываем изображение с помощью PIL (поддерживает PNG, JPG, etc.)
             image = Image.open(io.BytesIO(image_bytes))
-
             # Конвертируем в RGB если нужно (PNG может иметь альфа-канал)
             if image.mode in ('RGBA', 'LA', 'P'):
                 # Создаём белый фон для прозрачных PNG
@@ -94,18 +90,9 @@ class DataCollector:
             elif image.mode != 'RGB':
                 image = image.convert('RGB')
 
-            # Сохраняем как JPG
-            image.save(image_path, 'JPEG', quality=85)
-            print(f"✅ Изображение сохранено как JPG: {filename}, размер: {image.size}")
-
         except Exception as e:
-            print(f"❌ Ошибка обработки изображения: {e}")
-            # Пробуем сохранить как есть
-            with open(image_path, 'wb') as f:
-                f.write(image_bytes)
-            print(f"⚠ Сохранено как оригинал: {filename}")
+            log('error',f"❌ Ошибка обработки изображения: {e}")
 
-        # Определяем продукт из описания
         specific_food = self.extract_specific_food(desc)
 
         # Сохраняем в базу
@@ -116,8 +103,9 @@ class DataCollector:
                 ''', (image_path, desc, specific_food, True, user_id, datetime.now()))
         self.conn.commit()
 
-        print(f"✅ Данные сохранены: {filename} -> {specific_food}")
-        return filename, specific_food
+        log('debug',f"✅ Данные сохранены: {image_path} -> {specific_food}")
+        self.close()
+        return specific_food
 
     def get_labeled_data(self, min_confidence=0.6):
         """Возвращает размеченные данные для обучения"""

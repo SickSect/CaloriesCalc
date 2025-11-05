@@ -1,6 +1,8 @@
 import json
 import os.path
 
+from log.log_writer import log
+
 product_lists = []
 product_classes_idx = {}
 food_mapping = {}
@@ -22,7 +24,7 @@ def fill_list_on_init():
         tmp += 1
     for product in ru_list:
         product_lists.append(product)
-    print(f"Проинициализированы необходимые словари и списки для работы:\nproduct_lists: {product_lists} \nproduct_classes_idx:{product_classes_idx}\nfood_mapping:{food_mapping}")
+    log('info',f"Проинициализированы необходимые словари и списки для работы:\nproduct_lists: {product_lists} \nproduct_classes_idx:{product_classes_idx}\nfood_mapping:{food_mapping}")
 
 class DataLoader:
     def __init__(self, limit):
@@ -43,12 +45,12 @@ class DataLoader:
                 product_dir_path = os.path.join(images_folder_path, product)
                 num_files = len(os.listdir(product_dir_path))
                 if num_files == 0:
-                    print(f"В папке нет файлов по классу {product}")
+                    log('debug',f"В папке нет файлов по классу {product}")
                     self.absent_list[product] = limit
                 elif num_files < limit:
-                    print(f"В папке не хватает {limit - num_files} файлов по классу {product}")
+                    log('debug',f"В папке не хватает {limit - num_files} файлов по классу {product}")
                     self.absent_list[product] = limit - num_files
-                print(f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")
+                log('debug',f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")
             else:
-                print(f"В папке нет файлов по классу {product}")
+                log('debug',f"В папке нет файлов по классу {product}")
                 self.absent_list[product] = limit

@@ -1,19 +1,21 @@
 import os
 import threading
 
+from PIL import Image
 from bing_image_downloader import downloader
 
+from log.log_writer import log
 from ml.data_loader import product_lists
 
 
 images_folder = os.path.join(os.path.dirname(__file__), "downloaded_images")
 lock = threading.Lock()
 keys = product_lists
-num_threads = os.cpu_count() // 2
+num_threads = 1
 
 def download_train_data_for_classes(limit):
     threads = []
-    print(f"Количество доступных ядер / 2: {num_threads}")
+    log('info',f"Количество доступных ядер / 2: {num_threads}")
     for _ in range(num_threads):
         t = threading.Thread(target=multithread_downloading, args=(limit))
         t.start()
@@ -22,8 +24,28 @@ def download_train_data_for_classes(limit):
     for t in threads:
         t.join()
 
+def validate_images():
+    log('info', f'Начинаем валидацию изображений по ключам {keys}...')
+    num_deleted = 0
+    num_success = 0
+    for key in keys:
+        log('info', f'Проверка файлов по ключу: {key}')
+        for root, _, files in os.walk(os.path.join(images_folder, key)):
+            for file in files:
+                path = os.path.join(root, file)
+                try:
+                    with Image.open(path) as img:
+                        img.verify()
+                    log('debug', f'Файл проверен: {path} его режим цвета {img.mode}')
+                    num_success += 1
+                except Exception as e:
+                    log('error', f'❌ Битый файл: {path} {e}')
+                    os.remove(path)
+                    num_deleted += 1
+    log('info', f'Проверка завершена!\n Удалено файлов{num_deleted}, успешно проверенных файлов {num_success}')
+
 def multithread_downloading(limit):
-    print(f"В работе поток {threading.get_ident()}")
+    log('debug',f"В работе поток  ----->{threading.get_ident()}")
     while True:
         lock.acquire()
         if not keys:
@@ -37,13 +59,14 @@ def multithread_downloading(limit):
             output_dir=images_folder,
             force_replace=False,
             adult_filter_off=False,
-            timeout=10
+            timeout=10,
+            verbose=False
         )
-        print(f"✅ Скачивание завершено! Изображения сохранены в папке: {images_folder}/{key} в потоке {threading.get_ident()}")
+        log('debug',f"✅ Скачивание завершено! Изображения сохранены в папке: {images_folder}/{key} в потоке {threading.get_ident()}")
 
 
 def multithread_absent_downloading(absent_dict, absent_keys):
-    print(f"В работе поток {threading.get_ident()}")
+    log('debug',f"В работе поток  ----->{threading.get_ident()}")
     while True:
         lock.acquire()
         if not absent_keys:
@@ -57,12 +80,13 @@ def multithread_absent_downloading(absent_dict, absent_keys):
             output_dir=images_folder,
             force_replace=False,
             adult_filter_off=False,
-            timeout=10
+            timeout=10,
+            verbose=False
         )
-        print(f"✅ Скачивание завершено! Изображения сохранены в папке: {images_folder}/{key} в потоке {threading.get_ident()}")
+        log('debug',f"✅ Скачивание завершено! Изображения сохранены в папке: {images_folder}/{key} в потоке {threading.get_ident()}")
 
 def download_absent_data_for_classes(absent_dict):
-    print(f"Количество доступных ядер / 2: {num_threads}")
+    log('info',f"Количество доступных ядер / 2: {num_threads}")
     new_files_dict = {}
     absent_keys = list(absent_dict.keys())
     threads = []
@@ -81,7 +105,7 @@ def download_absent_data_for_classes(absent_dict):
             adult_filter_off=False,
             timeout=10
         )
-        print(f"✅ Данные были обновлены! Изображения сохранены в папке: {images_folder}/{product}")
+        log('debug',f"✅ Данные были обновлены! Изображения сохранены в папке: {images_folder}/{product}")
         for i in range(amount):
             new_files_dict[product] = f"Image_{i}"
     return new_files_dict
