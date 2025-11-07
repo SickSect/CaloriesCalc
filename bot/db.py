@@ -4,6 +4,7 @@ import uuid
 
 from bot.str_utils import get_lemma_word
 from log.log_writer import log
+from ml.data_loader import get_json_config
 
 
 class Database:
@@ -41,7 +42,27 @@ class Database:
                         date TIMESTAMP NOT NULL DEFAULT NOW
                     )
             ''')
+            # Заполнение таблицы products
+            self.init_products_table()
             conn.commit()
+
+    def init_products_table(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn = conn.cursor()
+            conn.execute("SELECT COUNT(*) FROM products")
+            row = conn.fetchall()
+            log('info', f'Проверка необходимости инициализации таблицы products...')
+            ccal_list = get_json_config('products_calories_per_hundred')
+            if row == 0:
+                for product in ccal_list:
+                    conn.execute("INSERT INTO products VALUES (?, ?, ?)", (str(uuid.uuid4()), product['calories_per_hundred'], product['product']))
+            if row != 0:
+                for product in ccal_list:
+                    conn.execute("SELECT product_name FROM products WHERE product_name = ?", (product['product'],))
+                    row = conn.fetchone()
+                    if row is None:
+                        conn.execute("INSERT INTO products VALUES (?, ?, ?)", (str(uuid.uuid4()), product['calories_per_hundred'], product['product']))
+
 
     def get_user_calories_per_day(self, telegram_id):
         with sqlite3.connect(self.db_path) as conn:
@@ -104,6 +125,17 @@ class Database:
             else:
                 return None
 
+    def get_daily_limit(self, telegram_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT daily_calories FROM calories_config WHERE telegram_id = ?', [telegram_id])
+            row = cursor.fetchone()
+            print(row)
+            if row[0] == 0:
+                return None
+            else:
+                return row[0]
+
     def set_daily_calories(self, telegram_id, daily_calories):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -153,7 +185,7 @@ class Database:
                 user_uuid = str(uuid.uuid4())
                 old_calories = row[0]
                 order_id = row[1]
-                log('info',"Save new note:", [old_calories + today_calories, product_name, order_id + 1, telegram_id, current_date])
+                log('info', f"Save new note: {[old_calories + today_calories, product_name, order_id + 1, telegram_id, current_date]}")
                 result = cursor.execute("INSERT INTO user_calories_history (id, telegram_id, todays_calories, product_name, order_id, date) VALUES (?, ?, ?, ?, ?, ?)",
                                         (user_uuid, telegram_id, old_calories + today_calories, product_name, order_id + 1, current_date))
             else:

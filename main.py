@@ -110,7 +110,11 @@ async def handle_today_calories(update: Update,  context: ContextTypes.DEFAULT_T
         report = db.get_today_calories(user_id)
         if report is not None:
             from bot.str_utils import print_daily_report
-            await update.message.reply_text( f"{print_daily_report(report)}", reply_markup=main_keyboard)
+            report = print_daily_report(report)
+            limit = db.get_daily_limit(update.effective_user.id)
+            if limit is not None:
+                report = f"{report}\n{f'Ваш дневной лимит: {limit} калорий'}"
+            await update.message.reply_text( f"{report}", reply_markup=main_keyboard)
         elif report is None:
             await update.message.reply_text( "Сегодня калории не записаны", reply_markup=main_keyboard)
         else:
@@ -291,6 +295,8 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
     """Обрабатывает ввод калорий за сегодняшний день"""
     product_calories_per_hundred = update.message.text.strip()
     context.user_data["calories_per_hundred"] = product_calories_per_hundred
+    log('info', f"Добавлен продукт: {context.user_data['product_name']} : {context.user_data['calories_per_hundred']}")
+    db.add_product(context.user_data["product_name"], context.user_data["calories_per_hundred"])
     await send_card(
         update,
         context,
