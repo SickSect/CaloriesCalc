@@ -8,7 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, Me
     ConversationHandler
 
 from bot.db import Database
-from bot.str_utils import print_help_info, multiply_calories
+from bot.str_utils import print_help_info, multiply_calories, send_card
 from log.log_writer import log
 
 from ml.dataset_collector import DataCollector
@@ -43,7 +43,7 @@ main_keyboard = ReplyKeyboardMarkup(
 )
 cancel_keyboard = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("Отмена")]
+        [KeyboardButton("❌ Отмена")]
     ]
 )
 
@@ -53,7 +53,20 @@ SET_CALORIES, ADD_PRODUCT, SET_PRODUCT_WEIGHT, SET_TODAY_CALORIES, SET_PRODUCT_C
 # --- Обработка /start или любого первого сообщения
 async def start(update: Update, context: CallbackContext):
     reply_markup = start_keyboard
-    await update.message.reply_text(print_help_info(), reply_markup=reply_markup)
+    await send_card(
+        update,
+        context,
+        title="ℹ️ Справка",
+        fields=[
+            ("📅", "Установить суточные калории - устанавливает потолок калорий на день"),
+            ("➕", "Добавить калории - добавляйте количество калорий после приема пищи"),
+            ("🔥", "Калории сегодня - посмотреть сколько калорий было сегодня"),
+            ("🧠", "Обучить модель - кнопка будет убрана позже"),
+            ("📸", "Распознать еду - модель определит продукт и его калорийность")
+        ],
+        footer="Выберите действие ниже ⬇️",
+        keyboard=reply_markup
+    )
 
 async def get_main_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = start_keyboard
@@ -63,9 +76,27 @@ async def handle_start_button(update: Update,  context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     if not db.check_user_exists(user_id):
         db.add_user(user_id)
-        await update.message.reply_text("Добавил вас!", reply_markup=main_keyboard)
+        await send_card(
+            update,
+            context,
+            title="✅ Успешно",
+            fields=[
+                ("👤", "Добавил вас!")
+            ],
+            footer="Выберите следующее действие ⬇️",
+            keyboard=main_keyboard
+        )
     else:
-        await update.message.reply_text("Мы нашли ваши заметки!", reply_markup=main_keyboard)
+        await send_card(
+            update,
+            context,
+            title="📒 Ваши заметки",
+            fields=[
+                ("📝", "Мы нашли ваши заметки!")
+            ],
+            footer="Выберите следующее действие ⬇️",
+            keyboard=main_keyboard
+        )
 
 async def handle_info_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     list = db.get_products_info()
@@ -81,7 +112,11 @@ async def handle_today_calories(update: Update,  context: ContextTypes.DEFAULT_T
         report = db.get_today_calories(user_id)
         if report is not None:
             from bot.str_utils import print_daily_report
-            await update.message.reply_text( f"{print_daily_report(report)}", reply_markup=main_keyboard)
+            report = print_daily_report(report)
+            limit = db.get_daily_limit(update.effective_user.id)
+            if limit is not None:
+                report = f"{report}\n{f'Ваш дневной лимит: {limit} калорий'}"
+            await update.message.reply_text( f"{report}", reply_markup=main_keyboard)
         elif report is None:
             await update.message.reply_text( "Сегодня калории не записаны", reply_markup=main_keyboard)
         else:
@@ -89,48 +124,69 @@ async def handle_today_calories(update: Update,  context: ContextTypes.DEFAULT_T
 
 async def cancel(update, context):
     """Отменяет диалог"""
-    await update.message.reply_text(
-        "Операция отменена",
-        reply_markup=main_keyboard
+    await send_card(
+        update,
+        context,
+        title="❌ Операция отменена",
+        fields=[],
+        footer="Выберите следующее действие ⬇️",
+        keyboard=main_keyboard
     )
     return
 
 async def start_calories_setup(update, context):
     """Начинает процесс установки калорий"""
-    await update.message.reply_text(
-        "Пожалуйста, введите количество калорий:",
-        reply_markup=cancel_keyboard
+    await send_card(
+        update,
+        context,
+        title="Ввод калорий",
+        fields=[
+            ("🔥", "Пожалуйста, введите количество калорий:")
+        ],
+        footer="Для отмены используйте кнопку ниже ⬇️",
+        keyboard=cancel_keyboard
     )
     return SET_CALORIES
 
 async def start_today_calories_setup(update, context):
-    """Начинает процесс добавления калорий на сегодня"""
-    await update.message.reply_text(
-        "Пожалуйста, введите название продукта:",
-        reply_markup=cancel_keyboard
-    )
-    return SET_PRODUCT_NAME
-
-async def start_product_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Пожалуйста, введите название продукта:",
-        reply_markup=cancel_keyboard
+    await send_card(
+        update,
+        context,
+        title="Ввод продукта",
+        fields=[
+            ("📛", "Пожалуйста, введите название продукта:")
+        ],
+        footer="Для отмены используйте кнопку ниже ⬇️",
+        keyboard=cancel_keyboard
     )
     return SET_PRODUCT_NAME
 
 async def start_new_product_adding(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Пожалуйста, введите название продукта:",
-        reply_markup=cancel_keyboard
+    await send_card(
+        update,
+        context,
+        title="Ввод продукта",
+        fields=[
+            ("📛", "Пожалуйста, введите название продукта:")
+        ],
+        footer="Для отмены используйте кнопку ниже ⬇️",
+        keyboard=cancel_keyboard
     )
     return SET_NEW_PRODUCT_CALORIES
 
 async def start_new_product_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
     product_name_input = update.message.text
     context.user_data["product_name_input"] = product_name_input
-    await update.message.reply_text(
-        "Пожалуйста, введите количество калорий на 100 грамм продукта:",
-        reply_markup=cancel_keyboard)
+    await send_card(
+        update,
+        context,
+        title="Ввод калорийности",
+        fields=[
+            ("🍽", "Пожалуйста, введите количество калорий на 100 г продукта:")
+        ],
+        footer="Для отмены используйте кнопку ниже ⬇️",
+        keyboard=cancel_keyboard
+    )
     return SAVE_NEW_PRODUCT
 
 async def save_new_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -149,19 +205,46 @@ async def set_calories(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         calories = int(text_input)
         db.set_daily_calories(user_id, calories)
-        await update.message.reply_text(
-            f"Установлено {calories} калорий в день!",
-            reply_markup=main_keyboard
+
+        await send_card(
+            update,
+            context,
+            title="Цель установлена ✅",
+            fields=[
+                ("🔥", f"Установлено {calories} ккал в день")
+            ],
+            footer="Выберите следующее действие ⬇️",
+            keyboard=main_keyboard
         )
         return ConversationHandler.END
     except ValueError:
-        await update.message.reply_text("Пожалуйста, введите число:", reply_markup=cancel_keyboard)
+        await send_card(
+            update,
+            context,
+            title="Введите данные",
+            fields=[
+                ("✏️", "Пожалуйста, введите число:")
+            ],
+            footer="Для отмены используйте кнопку ниже ⬇️",
+            keyboard=cancel_keyboard
+        )
         return SET_CALORIES
 
 async def set_calories_per_hundred(update: Update, context: ContextTypes.DEFAULT_TYPE):
     calories_per_hundred_input = update.message.text.strip()
     context.user_data["today_calories"] = calories_per_hundred_input
-    await update.message.reply_text(f"Калорийность указанного продукта: {calories_per_hundred_input}, мы добавили это в расписание калорий")
+
+    await send_card(
+        update,
+        context,
+        title="Информация обновлена",
+        fields=[
+            ("🔥 Калорийность продукта:", f"{calories_per_hundred_input} ккал / 100 г"),
+            ("🗓 Действие:", "добавлено в расписание калорий")
+        ],
+        footer="Выберите следующее действие ⬇️",
+        keyboard=main_keyboard
+    )
     db.add_calories_for_today(update.effective_user.id, calories_per_hundred_input, context.user_data["product_name"])
     return
 
@@ -170,8 +253,11 @@ async def set_product_weight(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data["product_weight"] = text_input
     weight_calories = multiply_calories(float(context.user_data["calories_per_hundred"]), float(context.user_data["product_weight"]))
     db.add_calories_for_today(update.effective_user.id, weight_calories, context.user_data["product_name"])
-    await update.message.reply_text(f"Добавлена запись:\n калорийность {weight_calories} продукта {context.user_data['product_name']}",
-                                    reply_markup=main_keyboard)
+    await send_card(update, context, title='Запись добавлена!', fields=[
+        ("📛 Продукт:", context.user_data["product_name"]),
+        ("🔥 Калорийность:", f"{weight_calories} ккал")
+    ],
+              footer='Выберите следующее действие', keyboard=main_keyboard)
     return
 
 async def set_product_name(update, context: ContextTypes.DEFAULT_TYPE):
@@ -185,8 +271,16 @@ async def set_product_name(update, context: ContextTypes.DEFAULT_TYPE):
                                         reply_markup=cancel_keyboard)
         if db.check_product_exists(text_input):
             product_info = db.get_product_info(text_input)
-            await update.message.reply_text(f"Найден продукт: {product_info[2]} с калорийностью {product_info[1]}\n\nВведите вес продукта в граммах:",
-                                            reply_markup=cancel_keyboard)
+            await update.message.reply_text(
+                f"🥦 <b>Информация о продукте</b>\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"📛 <b>Название:</b> <i>{product_info[2]}</i>\n"
+                f"🔥 <b>Калорийность:</b> <code>{product_info[1]} ккал / 100 г</code>\n"
+                f"━━━━━━━━━━━━━━━\n\n"
+                f"Введите вес продукта в граммах ⬇️",
+                parse_mode="HTML",
+                reply_markup=cancel_keyboard
+            )
             context.user_data["calories_per_hundred"] = product_info[1]
             return SET_PRODUCT_WEIGHT
         else:
@@ -203,20 +297,45 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
     """Обрабатывает ввод калорий за сегодняшний день"""
     product_calories_per_hundred = update.message.text.strip()
     context.user_data["calories_per_hundred"] = product_calories_per_hundred
-    await update.message.reply_text(f"Введите вес продукта:",
-                                    reply_markup=cancel_keyboard)
+    log('info', f"Добавлен продукт: {context.user_data['product_name']} : {context.user_data['calories_per_hundred']}")
+    db.add_product(context.user_data["product_name"], context.user_data["calories_per_hundred"])
+    await send_card(
+        update,
+        context,
+        title="Ввод веса",
+        fields=[
+            ("⚖️", "Введите вес продукта:")
+        ],
+        footer="Для отмены используйте кнопку ниже ⬇️",
+        keyboard=cancel_keyboard
+    )
     return SET_PRODUCT_WEIGHT
 
 
 async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not food_model.is_trained:
-        await update.message.reply_text(
-            "❌ Модель ещё не обучена!\n"
-            "💡 Сначала соберите данные и обучите модель.",
-            reply_markup=main_keyboard
+        await send_card(
+            update,
+            context,
+            title="⚠️ Модель не готова",
+            fields=[
+                ("❌", "Модель ещё не обучена!"),
+                ("💡", "Сначала соберите данные и обучите модель.")
+            ],
+            footer="Выберите следующее действие ⬇️",
+            keyboard=main_keyboard
         )
         return
-    await update.message.reply_text("📸 Пришлите фото еды для добавления в датасет")
+    await send_card(
+        update,
+        context,
+        title="Добавление фото 🍽",
+        fields=[
+            ("📸", "Пришлите фото еды для добавления в датасет")
+        ],
+        footer="Для отмены используйте кнопку ниже ⬇️",
+        keyboard=cancel_keyboard
+    )
     log('info',"Ожидание фото...")
     return PHOTO
 
