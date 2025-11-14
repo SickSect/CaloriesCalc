@@ -111,3 +111,14 @@ On the first launch:
 * Pillow  
 * requests  
 * python-dotenv
+* Torchvision
+
+| Lib / Import                                                                                                                 |                                                     License and link                                                      |
+|------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------:|
+| python-dotenv (`from dotenv import load_dotenv`)                                                                             |                  MIT — [github.com/theskumar/python-dotenv](https://github.com/theskumar/python-dotenv)                   |
+| python-telegram-bot (`from telegram import Update, ...` / `from telegram.ext import ...`)                                    | LGPLv3 — [github.com/python-telegram-bot/python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) |
+| NumPy (`import numpy as np`)                                                                                                 |                              BSD — [github.com/numpy/numpy](https://github.com/numpy/numpy)                               |
+| PyTorch (`import torch`, `import torch.nn as nn`, `from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler`) |                       BSD-style — [github.com/pytorch/pytorch](https://github.com/pytorch/pytorch)                        |
+| Torchvision (`import torchvision.transforms as transforms`, `import torchvision.models as models`)                           |                        BSD-style — [github.com/pytorch/vision](https://github.com/pytorch/vision)                         |
+| Pillow (PIL) (`from PIL import Image, ImageFile, UnidentifiedImageError`)                                                    |       PIL Software License (MIT-like) — [github.com/python-pillow/Pillow](https://github.com/python-pillow/Pillow)        |
+
