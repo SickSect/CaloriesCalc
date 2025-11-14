@@ -57,7 +57,8 @@ python main.py
   "product_limit": 50,
   "products_ru": ["яблоко", "картофель"],
   "products_en": ["apple", "potato"],
-  "products_calories_per_hundred": [52, 77]
+   {"product": "яблоко", "calories_per_hundred": 52},
+    {"product": "банан", "calories_per_hundred": 89},
 }
 ```
 
