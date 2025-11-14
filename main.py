@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-
+from multiprocessing import Process
 from dotenv import load_dotenv
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, MessageHandler, filters, ContextTypes, \
@@ -25,6 +25,8 @@ food_model = FoodModel()
 data_collector = DataCollector()
 limit_downloaded_train_images = get_json_config("product_limit")
 data_loader = DataLoader(limit_downloaded_train_images)
+process_1_ended = False
+process_2_ended = False
 
 start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
@@ -220,6 +222,13 @@ async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Предсказывает класс еды на фото"""
+    if not process_1_ended and not process_2_ended:
+        log('info', 'Процесс обучения невозможно начать, пока не закончится инициализация')
+        await update.message.reply_text(
+            f"❌ Процесс инициализация данных не завершен, для распознавания вернитесь позже",
+            reply_markup=main_keyboard
+        )
+        return
     log('info',"Получили фото. Начинается распознавание...")
     try:
         user_id = update.effective_user.id
@@ -256,9 +265,9 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # Добавляем команду для обучения модели
-async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def train_model_command():
     """Обучает модель на собранных данных"""
-    await update.message.reply_text("🧠 Проверяем возможность обучения...")
+    log('info', "🧠 Проверяем возможность обучения...")
 
     stats = data_collector.get_stats()
 
@@ -270,7 +279,7 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"💡 Продолжайте отправлять фото еды с описаниями!"
         )
     else:
-        await update.message.reply_text("🎯 Начинаем обучение модели... Это займёт несколько минут.")
+        log('info', "🎯 Начинаем обучение модели... Это займёт несколько минут.")
 
         # Обучаем модель
         success = food_model.train(data_collector, epochs=10)
@@ -287,8 +296,7 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 response += f"• {cls}: {count} фото\n"
         else:
             response = "❌ Не удалось обучить модель. Попробуйте позже."
-
-    await update.message.reply_text(response, reply_markup=main_keyboard)
+    log('info', response)
 
 async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохраняет фото еды для обучения модели"""
@@ -353,13 +361,17 @@ def main():
     app.add_handler(calories_conv_handler)
     app.run_polling()
 
-if __name__ == "__main__":
-    db.init_db()
-    # Существует ли обученная модель
-    exist_model = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/trained_model.pth"))
-    # Существует ли бд с данными
-    exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
-    count_rows_food_dataset = data_collector.get_stats()
+def model_train_process(exist_model, exist_dataset_db):
+    if not exist_model:
+        train_model_command()
+    elif exist_model and len(data_loader.absent_list) > 0:
+        file_path = os.path.join(os.path.dirname(__file__), "ml/trained_model.pth")
+        os.remove(file_path)
+        train_model_command()
+    process_1_ended = True
+
+
+def db_init_process(exist_model, exist_dataset_db):
     if not exist_model:
         validate_images()
     if len(data_loader.absent_list) > 0 and exist_dataset_db:
@@ -370,4 +382,41 @@ if __name__ == "__main__":
         init_database(data_collector)
     elif exist_dataset_db and count_rows_food_dataset['total_images'] == 0:
         init_database(data_collector)
+    process_2_ended = True
+
+
+if __name__ == "__main__":
+
+
+    db.init_db()
+    # Существует ли обученная модель
+    exist_model = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/trained_model.pth"))
+    # Существует ли бд с данными
+    exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
+    count_rows_food_dataset = data_collector.get_stats()
+
+    p1 = Process(target=db_init_process, args=(exist_model, exist_dataset_db))
+    p2 = Process(target=model_train_process, args=(exist_model, exist_dataset_db))
+
+    p1.start()
+    p2.start()
     main()
+
+
+    #if not exist_model:
+    #    validate_images()
+    #if len(data_loader.absent_list) > 0 and exist_dataset_db:
+    #    new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
+    #    add_files_to_database(new_files_dict, data_collector)
+    #elif not exist_dataset_db:
+    #    download_train_data_for_classes(limit_downloaded_train_images)
+    #    init_database(data_collector)
+    #elif exist_dataset_db and count_rows_food_dataset['total_images'] == 0:
+    #    init_database(data_collector)
+
+    #if not exist_model:
+    #    train_model_command()
+    #elif exist_model and len(data_loader.absent_list) > 0:
+    #    file_path = os.path.join(os.path.dirname(__file__), "ml/trained_model.pth")
+    #    os.remove(file_path)
+    #    train_model_command()
