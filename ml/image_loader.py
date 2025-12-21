@@ -24,6 +24,17 @@ def download_train_data_for_classes(limit):
     for t in threads:
         t.join()
 
+def download_test_data_for_classes(limit):
+    threads = []
+    log('info',f"Количество доступных ядер / 2: {num_threads}")
+    for _ in range(num_threads):
+        t = threading.Thread(target=multithread_downloading, args=(limit))
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
+
 def validate_images():
     log('info', f'Начинаем валидацию изображений по ключам {keys}...')
     num_deleted = 0
