@@ -505,8 +505,6 @@ def db_init_process(exist_model, exist_dataset_db):
 
 
 if __name__ == "__main__":
-
-
     db.init_db()
     # Существует ли обученная модель
     exist_model = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/trained_model.pth"))
@@ -521,21 +519,3 @@ if __name__ == "__main__":
     p2.start()
     main()
 
-
-    #if not exist_model:
-    #    validate_images()
-    #if len(data_loader.absent_list) > 0 and exist_dataset_db:
-    #    new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
-    #    add_files_to_database(new_files_dict, data_collector)
-    #elif not exist_dataset_db:
-    #    download_train_data_for_classes(limit_downloaded_train_images)
-    #    init_database(data_collector)
-    #elif exist_dataset_db and count_rows_food_dataset['total_images'] == 0:
-    #    init_database(data_collector)
-
-    #if not exist_model:
-    #    train_model_command()
-    #elif exist_model and len(data_loader.absent_list) > 0:
-    #    file_path = os.path.join(os.path.dirname(__file__), "ml/trained_model.pth")
-    #    os.remove(file_path)
-    #    train_model_command()
