@@ -4,14 +4,15 @@ import re
 from log.log_writer import log
 from ml.data_loader import product_lists
 
-def add_files_to_database(new_files_dict, collector):
-    current_dir = os.path.dirname(os.path.realpath(__file__))
+def add_files_to_train_database(new_files_dict, collector, train):
     for key, filename in new_files_dict.items():
         for path in filename:
             with open(path, 'rb') as f:
                 image_bytes = f.read()
             # Сохраняем в базу данных
+
             detected_food = collector.save_food_image(
+                train,
                 path,
                 image_bytes,
                 image_bytes, key, user_id=0  # user_id=0 для системных записей

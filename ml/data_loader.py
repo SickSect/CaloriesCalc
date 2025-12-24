@@ -27,7 +27,7 @@ def fill_list_on_init():
     log('info',f"Проинициализированы необходимые словари и списки для работы:\nproduct_lists: {product_lists} \nproduct_classes_idx:{product_classes_idx}\nfood_mapping:{food_mapping}")
 
 class DataLoader:
-    def __init__(self, limit):
+    def __init__(self, train_limit, test_limit):
         json_path = os.path.join(os.path.dirname(__file__), 'products.json')
         with open(json_path, "r", encoding="utf-8") as f:
             config = json.load(f)
@@ -38,19 +38,27 @@ class DataLoader:
         self.ru_list = ru_list
         self.en_list = en_list
         # Проверить что файлы уже возможно существуют в папках
-        images_folder_path = os.path.join(os.path.dirname(__file__), "downloaded_images")
-        self.absent_list = {}
-        for product in ru_list:
-            if os.path.exists(os.path.join(images_folder_path, product)):
-                product_dir_path = os.path.join(images_folder_path, product)
+        self.images_train_folder_path = os.path.join(os.path.dirname(__file__), "train_images")
+        self.images_test_folder_path = os.path.join(os.path.dirname(__file__), "test_images")
+        # TODO сделать более адекватное деление
+        self.trains_absent_list = self.loading_data(train_limit,self.images_train_folder_path)
+        self.test_absent_list = self.loading_data(test_limit, self.images_test_folder_path)
+
+
+    def loading_data(self, limit, folder):
+        absent_list = {}
+        for product in self.ru_list:
+            if os.path.exists(os.path.join(folder, product)):
+                product_dir_path = os.path.join(folder, product)
                 num_files = len(os.listdir(product_dir_path))
                 if num_files == 0:
                     log('debug',f"В папке нет файлов по классу {product}")
-                    self.absent_list[product] = limit
+                    absent_list[product] = limit
                 elif num_files < limit:
                     log('debug',f"В папке не хватает {limit - num_files} файлов по классу {product}")
-                    self.absent_list[product] = limit - num_files
+                    absent_list[product] = limit - num_files
                 log('debug',f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")
             else:
                 log('debug',f"В папке нет файлов по классу {product}")
-                self.absent_list[product] = limit
+                absent_list[product] = limit
+        return absent_list

@@ -8,7 +8,7 @@ from log.log_writer import log
 from ml.data_loader import product_lists
 
 
-images_folder = os.path.join(os.path.dirname(__file__), "downloaded_images")
+
 lock = threading.Lock()
 keys = product_lists
 num_threads = 1
@@ -30,7 +30,7 @@ def validate_images():
     num_success = 0
     for key in keys:
         log('info', f'Проверка файлов по ключу: {key}')
-        for root, _, files in os.walk(os.path.join(images_folder, key)):
+        for root, _, files in os.walk(os.path.join(train_images_folder, key)):
             for file in files:
                 path = os.path.join(root, file)
                 try:
@@ -85,7 +85,7 @@ def multithread_absent_downloading(absent_dict, absent_keys):
         )
         log('debug',f"✅ Скачивание завершено! Изображения сохранены в папке: {images_folder}/{key} в потоке {threading.get_ident()}")
 
-def download_absent_data_for_classes(absent_dict):
+def download_absent_data_for_classes(absent_dict, folder_name):
     log('info',f"Количество доступных ядер / 2: {num_threads}")
     new_files_dict = {}
     absent_keys = list(absent_dict.keys())
@@ -95,17 +95,17 @@ def download_absent_data_for_classes(absent_dict):
         t.start()
         threads.append(t)
 
-
+    folder = os.path.join(os.path.dirname(__file__), folder_name)
     for product, amount in absent_dict.items():
         downloader.download(
             product,
             limit=amount,
-            output_dir=images_folder,
+            output_dir=folder,
             force_replace=False,
             adult_filter_off=False,
             timeout=10
         )
-        log('debug',f"✅ Данные были обновлены! Изображения сохранены в папке: {images_folder}/{product}")
+        log('debug',f"✅ Данные были обновлены! Изображения сохранены в папке: {folder_name}/{product}")
         for i in range(amount):
             new_files_dict[product] = f"Image_{i}"
     return new_files_dict

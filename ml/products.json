@@ -1,5 +1,6 @@
 {
-  "product_limit": 50,
+  "train_product_limit": 50,
+  "test_product_limit": 5,
   "products_ru": [
     "яблоко",
     "банан",

@@ -1,21 +1,18 @@
-import logging
 import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, MessageHandler, filters, ContextTypes, \
     ConversationHandler
-
 from bot.db import Database
 from bot.str_utils import print_help_info, multiply_calories
 from log.log_writer import log
-
 from ml.dataset_collector import DataCollector
-from ml.dataset_init import init_database, add_files_to_database
+from ml.dataset_init import add_files_to_train_database
 from ml.food_model import FoodModel
-from ml.image_loader import download_train_data_for_classes, download_absent_data_for_classes, validate_images
 from ml.data_loader import fill_list_on_init, DataLoader, get_json_config
+from ml.loader.image_loader import validate_images, download_absent_data_for_classes
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -23,8 +20,9 @@ db = Database()
 fill_list_on_init()
 food_model = FoodModel()
 data_collector = DataCollector()
-limit_downloaded_train_images = get_json_config("product_limit")
-data_loader = DataLoader(limit_downloaded_train_images)
+limit_downloaded_train_images = get_json_config("train_product_limit")
+limit_downloaded_test_images = get_json_config("test_product_limit")
+data_loader = DataLoader(limit_downloaded_train_images, limit_downloaded_test_images)
 
 start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
@@ -354,17 +352,23 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
+
+    # DB initialisation
     db.init_db()
     # Существует ли обученная модель
     exist_model = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/trained_model.pth"))
     # Существует ли бд с данными
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
-    count_rows_food_dataset = data_collector.get_stats()
+    #count_rows_food_dataset = data_collector.get_stats()
     if not exist_model:
         validate_images()
-    if len(data_loader.absent_list) > 0 and exist_dataset_db:
-        new_files_dict = download_absent_data_for_classes(data_loader.absent_list)
-        add_files_to_database(new_files_dict, data_collector)
+    if len(data_loader.trains_absent_list) > 0 and exist_dataset_db:
+        new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'train_images')
+        add_files_to_train_database(new_files_dict, data_collector, True)
+    if len(data_loader.test_absent_list) > 0 and exist_dataset_db:
+        new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'test_images')
+        add_files_to_train_database(new_files_dict, data_collector, False)
+
     elif not exist_dataset_db:
         download_train_data_for_classes(limit_downloaded_train_images)
         init_database(data_collector)

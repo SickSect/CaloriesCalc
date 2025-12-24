@@ -62,6 +62,19 @@ class DataCollector:
         ''')
 
         self.conn.execute('''
+                    CREATE TABLE IF NOT EXISTS test_food_images (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        image_path TEXT NOT NULL,
+                        user_description TEXT,
+                        predicted_class TEXT,
+                        confidence REAL,
+                        verified BOOLEAN DEFAULT FALSE,
+                        user_id INTEGER,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+        self.conn.execute('''
             CREATE TABLE IF NOT EXISTS model_versions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 version TEXT,
@@ -72,7 +85,7 @@ class DataCollector:
         ''')
         self.conn.commit()
 
-    def save_food_image(self, path, image_bytes, desc, user_id, predicted_class=None, confidence=0):
+    def save_food_image(self, train_flag, path, image_bytes, desc, user_id, predicted_class=None, confidence=0):
         self.conn = sqlite3.connect(self.db_path)
         """Сохраняет фото еды в датасет, конвертируя в JPG если нужно"""
         image_path = os.path.join(self.images_dir, path)
@@ -94,10 +107,14 @@ class DataCollector:
             log('error',f"❌ Ошибка обработки изображения: {e}")
 
         specific_food = self.extract_specific_food(desc)
-
+        table_name = ''
+        if not train_flag:
+            table_name = 'test_food_images'
+        else:
+            table_name = 'food_images'
         # Сохраняем в базу
         self.conn.execute('''
-                    INSERT INTO food_images 
+                    INSERT INTO ''' + table_name + ''' 
                     (image_path, user_description, predicted_class, verified, user_id, created_at) 
                     VALUES (?, ?, ?, ?, ?, ?)
                 ''', (image_path, desc, specific_food, True, user_id, datetime.now()))
