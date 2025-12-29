@@ -5,7 +5,7 @@ import downloader
 from PIL import Image
 
 from log.log_writer import log
-from ml.data_loader import product_lists
+from ml.loader.data_loader import product_lists
 
 
 
@@ -67,7 +67,7 @@ def multithread_downloading(limit, folder_name):
         log('debug',f"✅ Скачивание завершено! Изображения сохранены в папке: {folder_name}/{key} в потоке {threading.get_ident()}")
 
 
-def multithread_absent_downloading(absent_dict, absent_keys):
+def multithread_absent_downloading(absent_dict, absent_keys, images_folder):
     log('debug',f"В работе поток  ----->{threading.get_ident()}")
     while True:
         lock.acquire()
@@ -93,7 +93,7 @@ def download_absent_data_for_classes(absent_dict, folder_name):
     absent_keys = list(absent_dict.keys())
     threads = []
     for _ in range(num_threads):
-        t = threading.Thread(target=multithread_absent_downloading, args=(absent_dict, absent_keys))
+        t = threading.Thread(target=multithread_absent_downloading, args=(absent_dict, absent_keys, folder_name))
         t.start()
         threads.append(t)
 

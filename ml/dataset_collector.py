@@ -6,7 +6,7 @@ from datetime import datetime
 from PIL import Image
 
 from log.log_writer import log
-from ml.data_loader import product_lists
+from ml.loader.data_loader import product_lists
 
 
 class DataCollector:

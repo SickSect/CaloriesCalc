@@ -11,8 +11,9 @@ from log.log_writer import log
 from ml.dataset_collector import DataCollector
 from ml.dataset_init import add_files_to_train_database, init_database
 from ml.food_model import FoodModel
-from ml.data_loader import fill_list_on_init, DataLoader, get_json_config
-from ml.loader.image_loader import validate_images_by_folder, download_absent_data_for_classes, validate_images_by_folder
+from ml.loader.data_loader import fill_list_on_init, DataLoader, get_json_config
+from ml.loader.image_loader import download_absent_data_for_classes, \
+    validate_images_by_folder
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -372,12 +373,5 @@ if __name__ == "__main__":
     if not exist_dataset_db:
         download_absent_data_for_classes(limit_downloaded_train_images, 'train_images')
         download_absent_data_for_classes(limit_downloaded_test_images, 'test_images')
-        init_database(data_collector)
-
-
-    elif not exist_dataset_db:
-        download_train_data_for_classes(limit_downloaded_train_images)
-        init_database(data_collector)
-    elif exist_dataset_db and count_rows_food_dataset['total_images'] == 0:
         init_database(data_collector)
     main()

@@ -1,4 +1,6 @@
 from torch import nn
+from torchvision.transforms import transforms
+
 
 class FoodNet(nn.Module):
     def __init__(self):
@@ -10,6 +12,21 @@ class FoodNet(nn.Module):
         self.fc2 = nn.Linear(1024, 32)  # ← ИСПРАВЛЕНО!
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.3)
+        # Трансформации
+        self.train_transform = transforms.Compose([
+            transforms.Resize(256),  # Сохраняем пропорции
+            transforms.CenterCrop(224),  # ← Берём центр — там почти всегда сам продукт
+            transforms.ColorJitter(brightness=0.2, contrast=0.2),  # ← Только цвет/контраст
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+        self.val_transform = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
 
     def forward(self, x):
         x = self.pool(self.relu(self.conv1(x)))  # (N, 64, 128, 128)

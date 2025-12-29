@@ -1,8 +1,7 @@
 import os
-import re
 
 from log.log_writer import log
-from ml.data_loader import product_lists
+from ml.loader.data_loader import product_lists
 
 def add_files_to_train_database(new_files_dict, collector, train):
     for key, filename in new_files_dict.items():
@@ -37,52 +36,9 @@ def create_image_dict_by_folder(folder_name):
         image_dict[key] = image_files
     return image_dict
 
-def complex_saving_to_db(image_dict, folder_name, train):
-    for key, files in image_dict.items():
-        try:
-            food_name = key
-            # Полный путь к файлу
-            class_folder = os.path.join(folder_name, key)
-            log('info',f"Читаем папку: {class_folder}")
-            for file in files:
-                file_path = os.path.join(class_folder, file)
-                log('debug',f"читаем файл: {file}")
-                # Читаем файл
-                with open(file_path, 'rb') as f:
-                    image_bytes = f.read()
-
-                # Сохраняем в базу данных
-                detected_food = collector.save_food_image(
-                    file_path,
-                    image_bytes, food_name, user_id=0  # user_id=0 для системных записей
-                )
-                log('debug',f"✅ Добавлено: {file} -> {detected_food}")
-                added_count += 1
-        except Exception as e:
-            log('error',f"❌ Ошибка при обработке {key}: {e}")
-            skipped_count += 1
-
-def init_database(collector):
-    """Инициализирует базу данных и заполняет её готовыми изображениями"""
-    log('debug',"🗄️ Инициализация базы данных...")
-    if os.path.exists(os.path.join(os.path.dirname(__file__), "food_dataset.db")):
-        log('debug',"База данных была проинициализирована!")
-    # Путь к папке с готовыми изображениями
-    train_images_folder = os.path.join(os.path.dirname(__file__), "train_images")
-    test_images_folder = os.path.join(os.path.dirname(__file__), "train_images")
-    # TODO а точно ли тут надо делать проверку на наличие папки? проще создать при отсутсвии. ПЕРЕДЕЛАТЬ
-    if not os.path.exists(train_images_folder):
-        log('error',f"❌ Папка с изображениями не найдена: {train_images_folder}")
-        log('error',f"📁 Создайте папку ml/{train_images_folder} и положите туда изображения")
-        return
-    if not os.path.exists(test_images_folder):
-        log('error',f"❌ Папка с изображениями не найдена: {test_images_folder}")
-        log('error',f"📁 Создайте папку ml/{test_images_folder} и положите туда изображения")
-        return
-
-    train_image_dict = create_image_dict_by_folder('train_images')
-    test_image_dict = create_image_dict_by_folder('test_images')
-
+def saving_dict_to_db(image_dict, train_flag, images_folder, collector):
+    added_count = 0
+    skipped_count = 0
     for key, files in image_dict.items():
         try:
             food_name = key
@@ -98,6 +54,7 @@ def init_database(collector):
 
                 # Сохраняем в базу данных
                 detected_food = collector.save_food_image(
+                    train_flag,
                     file_path,
                     image_bytes, food_name, user_id=0  # user_id=0 для системных записей
                 )
@@ -123,4 +80,27 @@ def init_database(collector):
         log('debug',f"   Собрано: {stats['trainable_samples']} фото")
         log('debug',f"   Нужно: минимум 20 фото и 5 различных продуктов")
 
+
+def init_database(collector):
+    """Инициализирует базу данных и заполняет её готовыми изображениями"""
+    log('debug',"🗄️ Инициализация базы данных...")
+    if os.path.exists(os.path.join(os.path.dirname(__file__), "food_dataset.db")):
+        log('debug',"База данных была проинициализирована!")
+    # Путь к папке с готовыми изображениями
+    train_images_folder = os.path.join(os.path.dirname(__file__), "train_images")
+    test_images_folder = os.path.join(os.path.dirname(__file__), "train_images")
+    # TODO а точно ли тут надо делать проверку на наличие папки? проще создать при отсутсвии. ПЕРЕДЕЛАТЬ
+    if not os.path.exists(train_images_folder):
+        log('error',f"❌ Папка с изображениями не найдена: {train_images_folder}")
+        log('error',f"📁 Создайте папку ml/{train_images_folder} и положите туда изображения")
+        return
+    if not os.path.exists(test_images_folder):
+        log('error',f"❌ Папка с изображениями не найдена: {test_images_folder}")
+        log('error',f"📁 Создайте папку ml/{test_images_folder} и положите туда изображения")
+        return
+
+    train_image_dict = create_image_dict_by_folder('train_images')
+    test_image_dict = create_image_dict_by_folder('test_images')
+    saving_dict_to_db(train_image_dict, True, train_images_folder, collector)
+    saving_dict_to_db(test_image_dict, False, test_images_folder, collector)
     collector.close()
