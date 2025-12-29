@@ -9,10 +9,10 @@ from bot.db import Database
 from bot.str_utils import print_help_info, multiply_calories
 from log.log_writer import log
 from ml.dataset_collector import DataCollector
-from ml.dataset_init import add_files_to_train_database
+from ml.dataset_init import add_files_to_train_database, init_database
 from ml.food_model import FoodModel
 from ml.data_loader import fill_list_on_init, DataLoader, get_json_config
-from ml.loader.image_loader import validate_images, download_absent_data_for_classes
+from ml.loader.image_loader import validate_images_by_folder, download_absent_data_for_classes, validate_images_by_folder
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -361,13 +361,19 @@ if __name__ == "__main__":
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
     #count_rows_food_dataset = data_collector.get_stats()
     if not exist_model:
-        validate_images()
+        validate_images_by_folder('test_images')
+        validate_images_by_folder('train_images')
     if len(data_loader.trains_absent_list) > 0 and exist_dataset_db:
         new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'train_images')
         add_files_to_train_database(new_files_dict, data_collector, True)
     if len(data_loader.test_absent_list) > 0 and exist_dataset_db:
         new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'test_images')
         add_files_to_train_database(new_files_dict, data_collector, False)
+    if not exist_dataset_db:
+        download_absent_data_for_classes(limit_downloaded_train_images, 'train_images')
+        download_absent_data_for_classes(limit_downloaded_test_images, 'test_images')
+        init_database(data_collector)
+
 
     elif not exist_dataset_db:
         download_train_data_for_classes(limit_downloaded_train_images)
