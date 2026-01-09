@@ -7,11 +7,12 @@ class FoodNet(nn.Module):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2)
-        self.fc1 = nn.Linear(128 * 64 * 64, 1024)
-        self.fc2 = nn.Linear(1024, 32)  # ← ИСПРАВЛЕНО!
+        self.fc1 = nn.Linear(256 * 28 * 28, 512)
+        self.fc2 = nn.Linear(512, 32)  # ← ИСПРАВЛЕНО!
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(0.5)
         # Трансформации
         self.train_transform = transforms.Compose([
             transforms.Resize(256),  # Сохраняем пропорции
@@ -29,9 +30,11 @@ class FoodNet(nn.Module):
         ])
 
     def forward(self, x):
-        x = self.pool(self.relu(self.conv1(x)))  # (N, 64, 128, 128)
-        x = self.pool(self.relu(self.conv2(x)))  # (N, 128, 64, 64)
-        x = x.view(x.size(0), -1)                # (N, 524288)
-        x = self.dropout(self.relu(self.fc1(x))) # (N, 1024)
-        x = self.fc2(x)                          # (N, 32)
+        x = self.pool(self.relu(self.conv1(x)))
+        x = self.pool(self.relu(self.conv2(x)))
+        x = self.pool(self.relu(self.conv3(x)))
+
+        x = x.view(x.size(0), -1)
+        x = self.dropout(self.relu(self.fc1(x)))
+        x = self.fc2(x)
         return x

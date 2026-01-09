@@ -41,7 +41,7 @@ class DataLoader:
         self.images_train_folder_path = os.path.join(os.path.dirname(__file__), "train_images")
         self.images_test_folder_path = os.path.join(os.path.dirname(__file__), "test_images")
         # TODO сделать более адекватное деление
-        self.trains_absent_list = self.loading_data(train_limit,self.images_train_folder_path)
+        self.trains_absent_list = self.loading_data(train_limit, self.images_train_folder_path)
         self.test_absent_list = self.loading_data(test_limit, self.images_test_folder_path)
 
 
@@ -52,13 +52,13 @@ class DataLoader:
                 product_dir_path = os.path.join(folder, product)
                 num_files = len(os.listdir(product_dir_path))
                 if num_files == 0:
-                    log('debug',f"В папке нет файлов по классу {product}")
+                    log('debug',f"В папке {product_dir_path} нет файлов по классу {product}")
                     absent_list[product] = limit
                 elif num_files < limit:
-                    log('debug',f"В папке не хватает {limit - num_files} файлов по классу {product}")
+                    log('debug',f"В папке {product_dir_path} не хватает {limit - num_files} файлов по классу {product}")
                     absent_list[product] = limit - num_files
                 log('debug',f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")
             else:
-                log('debug',f"В папке нет файлов по классу {product}")
+                log('debug',f"В папке {folder} нет файлов по классу {product}")
                 absent_list[product] = limit
         return absent_list

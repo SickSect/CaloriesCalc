@@ -9,17 +9,15 @@ from bot.db import Database
 from bot.str_utils import print_help_info, multiply_calories
 from log.log_writer import log
 from ml.dataset_collector import DataCollector
-from ml.dataset_init import add_files_to_train_database, init_database
-from ml.food_model import FoodModel
 from ml.loader.data_loader import fill_list_on_init, DataLoader, get_json_config
-from ml.loader.image_loader import download_absent_data_for_classes, \
-    validate_images_by_folder
+from ml.loader.image_downloader import download_data_to_folder
+from ml.model.food_model import FoodNet
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
 fill_list_on_init()
-food_model = FoodModel()
+food_model = FoodNet()
 data_collector = DataCollector()
 limit_downloaded_train_images = get_json_config("train_product_limit")
 limit_downloaded_test_images = get_json_config("test_product_limit")
@@ -353,25 +351,31 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-
-    # DB initialisation
-    db.init_db()
-    # Существует ли обученная модель
-    exist_model = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/trained_model.pth"))
-    # Существует ли бд с данными
+    # init db
+    # Download
+    print('LEN TRAIN:', len(data_loader.trains_absent_list))
+    print('KEYS TRAIN:', data_loader.trains_absent_list.keys())
+    print('LEN TEST', len(data_loader.test_absent_list))
+    print('KEYS TEST:', data_loader.test_absent_list.keys())
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
-    #count_rows_food_dataset = data_collector.get_stats()
-    if not exist_model:
-        validate_images_by_folder('test_images')
-        validate_images_by_folder('train_images')
     if len(data_loader.trains_absent_list) > 0 and exist_dataset_db:
-        new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'train_images')
-        add_files_to_train_database(new_files_dict, data_collector, True)
+       new_files_dict = download_data_to_folder(data_loader.trains_absent_list, 'train_images')
+
     if len(data_loader.test_absent_list) > 0 and exist_dataset_db:
-        new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'test_images')
-        add_files_to_train_database(new_files_dict, data_collector, False)
-    if not exist_dataset_db:
-        download_absent_data_for_classes(limit_downloaded_train_images, 'train_images')
-        download_absent_data_for_classes(limit_downloaded_test_images, 'test_images')
-        init_database(data_collector)
-    main()
+       new_files_dict = download_data_to_folder(data_loader.test_absent_list, 'test_images')
+
+
+    #if exist_model:
+    #    validate_images_by_folder('test_images')
+    #    validate_images_by_folder('train_images')
+    #if len(data_loader.trains_absent_list) > 0 and exist_dataset_db:
+    #    new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'train_images')
+    #    add_files_to_database(new_files_dict, data_collector, True)
+    #if len(data_loader.test_absent_list) > 0 and exist_dataset_db:
+    #    new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'test_images')
+    #    add_files_to_database(new_files_dict, data_collector, False)
+    #if not exist_dataset_db:
+    #    download_absent_data_for_classes(limit_downloaded_train_images, 'train_images')
+    #    download_absent_data_for_classes(limit_downloaded_test_images, 'test_images')
+    #    init_database(data_collector)
+    #main()

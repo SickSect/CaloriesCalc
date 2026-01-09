@@ -14,17 +14,20 @@ class DataCollector:
         # сохраняем пути
         self.ml_dir = os.path.dirname(os.path.abspath(__file__))
         self.db_path = os.path.join(self.ml_dir, "food_dataset.db")
-        self.images_dir = os.path.join(self.ml_dir, "collected_images")
+        self.test_images_dir = os.path.join(self.ml_dir, "test_images")
+        self.train_images_dir = os.path.join(self.ml_dir, "train_images")
 
         # Список конкретных продуктов (будем расширять)
         self.specific_foods = product_lists
         # Создаём папки
-        os.makedirs(self.images_dir, exist_ok=True)
+        os.makedirs(self.test_images_dir, exist_ok=True)
+        os.makedirs(self.train_images_dir, exist_ok=True)
         # Подключаем базу
         self.conn = sqlite3.connect(self.db_path)
         self.create_tables()
         log('debug',f"📊 Сборщик данных инициализирован")
-        log('debug',f"📁 Папка изображений: {self.images_dir}")
+        log('debug',f"📁 Папка изображений TEST: {self.test_images_dir}")
+        log('debug', f"📁 Папка изображений TRAIN: {self.train_images_dir}")
         log('debug',f"📁 База данных: {self.db_path}")
 
     def extract_specific_food(self, description):
