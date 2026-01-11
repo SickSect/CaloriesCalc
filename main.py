@@ -359,10 +359,10 @@ if __name__ == "__main__":
     print('KEYS TEST:', data_loader.test_absent_list.keys())
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
     if len(data_loader.trains_absent_list) > 0 and exist_dataset_db:
-       new_files_dict = download_data_to_folder(data_loader.trains_absent_list, 'train_images')
+       download_data_to_folder(data_loader.trains_absent_list, 'train_images')
 
     if len(data_loader.test_absent_list) > 0 and exist_dataset_db:
-       new_files_dict = download_data_to_folder(data_loader.test_absent_list, 'test_images')
+       download_data_to_folder(data_loader.test_absent_list, 'test_images')
 
 
     #if exist_model:
