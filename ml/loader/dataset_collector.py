@@ -16,12 +16,9 @@ class DataCollector:
         self.db_path = os.path.join(self.ml_dir, "food_dataset.db")
         self.test_images_dir = os.path.join(self.ml_dir, "test_images")
         self.train_images_dir = os.path.join(self.ml_dir, "train_images")
-
         # Список конкретных продуктов (будем расширять)
         self.specific_foods = product_lists
         # Создаём папки
-        os.makedirs(self.test_images_dir, exist_ok=True)
-        os.makedirs(self.train_images_dir, exist_ok=True)
         # Подключаем базу
         self.conn = sqlite3.connect(self.db_path)
         self.create_tables()
@@ -54,7 +51,7 @@ class DataCollector:
         self.conn.execute('''
             CREATE TABLE IF NOT EXISTS food_images (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                image_path TEXT NOT NULL,
+                image_path TEXT NOT NULL UNIQUE,
                 user_description TEXT,
                 predicted_class TEXT,
                 confidence REAL,
@@ -67,7 +64,7 @@ class DataCollector:
         self.conn.execute('''
                     CREATE TABLE IF NOT EXISTS test_food_images (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        image_path TEXT NOT NULL,
+                        image_path TEXT NOT NULL UNIQUE,
                         user_description TEXT,
                         predicted_class TEXT,
                         confidence REAL,
@@ -88,7 +85,7 @@ class DataCollector:
         ''')
         self.conn.commit()
 
-    def save_food_image(self, train_flag, path, image_bytes, desc, user_id, predicted_class=None, confidence=0):
+    def save_food_image(self, train_flag, path, image_bytes, desc, user_id, predicted_class=None):
         self.conn = sqlite3.connect(self.db_path)
         """Сохраняет фото еды в датасет, конвертируя в JPG если нужно"""
         image_path = os.path.join(self.images_dir, path)
@@ -109,7 +106,7 @@ class DataCollector:
         except Exception as e:
             log('error',f"❌ Ошибка обработки изображения: {e}")
 
-        specific_food = self.extract_specific_food(desc)
+        specific_food = self.extract_specific_food( )
         table_name = ''
         if not train_flag:
             table_name = 'test_food_images'
@@ -126,6 +123,29 @@ class DataCollector:
         log('debug',f"✅ Данные сохранены: {image_path} -> {specific_food}")
         self.close()
         return specific_food
+
+    def save_food_image_by_path(self, train_flag, path, desc, user_id, predicted_class=None):
+        #Какая бд, тест или трен
+        table_name = 'food_images' if train_flag else 'test_food_images'
+        # Существует ли изображение в бд?
+        self.conn = sqlite3.connect(self.db_path)
+        cursor = self.conn.cursor()
+        sql = f'SELECT 1 FROM {table_name} WHERE image_path = ?'
+        cursor.execute(sql, (path,))
+        exists = cursor.fetchone()
+        if exists:
+            self.conn.close()
+            log('info', f'файл {path} уже добавлен')
+            return
+        self.conn.execute('''
+                            INSERT INTO ''' + table_name + ''' 
+                            (image_path, user_description, predicted_class, verified, user_id, created_at) 
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''',(path, desc, predicted_class, True, user_id, datetime.now()))
+        self.conn.commit()
+        log('debug', f"✅ Данные сохранены: {path} -> {predicted_class}")
+        self.close()
+
 
     def get_labeled_data(self, min_confidence=0.6):
         """Возвращает размеченные данные для обучения"""

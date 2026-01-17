@@ -1,16 +1,23 @@
 import os
 from datetime import datetime
 
+import torch
 from dotenv import load_dotenv
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, MessageHandler, filters, ContextTypes, \
     ConversationHandler
+from torch import nn, optim
+from torch.utils.data import DataLoader
+from torchvision.datasets import ImageFolder
+
 from bot.db import Database
 from bot.str_utils import print_help_info, multiply_calories
 from log.log_writer import log
-from ml.dataset_collector import DataCollector
-from ml.loader.data_loader import fill_list_on_init, DataLoader, get_json_config
-from ml.loader.image_downloader import download_data_to_folder
+from ml.loader.dataset_collector import DataCollector
+from ml.loader.data_loader import fill_list_on_init, CustomDataLoader, get_json_config
+from ml.loader.image_process import download_data_to_folder
+
+from ml.loader.image_process import save_image_to_db_by_folder
 from ml.model.food_model import FoodNet
 
 load_dotenv()
@@ -21,7 +28,7 @@ food_model = FoodNet()
 data_collector = DataCollector()
 limit_downloaded_train_images = get_json_config("train_product_limit")
 limit_downloaded_test_images = get_json_config("test_product_limit")
-data_loader = DataLoader(limit_downloaded_train_images, limit_downloaded_test_images)
+data_loader = CustomDataLoader(limit_downloaded_train_images, limit_downloaded_test_images)
 
 start_keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("Начать")]],
@@ -287,39 +294,6 @@ async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await update.message.reply_text(response, reply_markup=main_keyboard)
 
-async def handle_photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Сохраняет фото еды для обучения модели"""
-    try:
-        user_id = update.effective_user.id
-        photo = update.message.photo[-1]
-        file = await context.bot.get_file(photo.file_id)
-        caption = update.message.caption or "Фото еды"
-        # Скачиваем фото
-        image_bytes = await file.download_as_bytearray()
-        # Сохраняем в датасет
-        predicted_class = data_collector.save_food_image(
-            bytes(image_bytes), caption, user_id
-        )
-        # Статистика
-        stats = data_collector.get_stats()
-        response = (
-            f"📸 Фото сохранено в датасет!\n"
-            f"📝 Описание: '{caption}'\n"
-            f"🏷 Авто-разметка: {predicted_class}\n"
-            f"📊 Всего собрано: {stats['total_images']} фото\n"
-            f"🎯 Готово для обучения: {stats['trainable_samples']} фото"
-        )
-        if stats['can_train'] and not food_model.is_trained:
-            response += "\n\n✅ Достаточно данных для обучения модели!"
-        await update.message.reply_text(response, reply_markup=main_keyboard)
-
-    except Exception as e:
-        log('info', f"❌ Ошибка сохранения фото: {e}")
-        await update.message.reply_text(
-            "❌ Не удалось сохранить фото. Попробуйте ещё раз.",
-            reply_markup=main_keyboard
-        )
-
 # --- Запуск бота ---
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -359,23 +333,54 @@ if __name__ == "__main__":
     print('KEYS TEST:', data_loader.test_absent_list.keys())
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
     if len(data_loader.trains_absent_list) > 0 and exist_dataset_db:
-       download_data_to_folder(data_loader.trains_absent_list, 'train_images')
-
+        download_data_to_folder(data_loader.trains_absent_list, 'train_images')
+    save_image_to_db_by_folder('train_images', data_collector)
     if len(data_loader.test_absent_list) > 0 and exist_dataset_db:
-       download_data_to_folder(data_loader.test_absent_list, 'test_images')
+        download_data_to_folder(data_loader.test_absent_list, 'test_images')
+    save_image_to_db_by_folder('test_images', data_collector)
+    # Создание датасетов
+    train_dataset = ImageFolder(root='ml/loader/train_images', transform=food_model.train_transform)
+    test_dataset = ImageFolder(root='ml/loader/test_images', transform=food_model.val_transform)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False, num_workers=4)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4)
+    # Вывод и изменение слоя в модели
+    train_num_classes = len(train_dataset.classes)
+    print("Классы:", train_dataset.classes)  # ['яблоко', 'банан', ...]
+    print("Число классов:", train_num_classes)
+    test_num_classes = len(test_dataset.classes)
+    print("Классы:", test_dataset.classes)  # ['яблоко', 'банан', ...]
+    print("Число классов:", test_num_classes)
+    food_model.fc2 = nn.Linear(in_features=512, out_features=train_num_classes)
+    # Обучение
+    print("CUDA доступна:", torch.cuda.is_available())
+    print("Версия CUDA:", torch.version.cuda)
+    print("Число GPU:", torch.cuda.device_count())
 
+    print(torch.__version__)  # 2.9.1
+    print(torch.version.cuda)  # None ← вот ключ!
+    print(torch.cuda.is_available())  # False
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    log('info', f'DEVICE: {device}')
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(food_model.parameters(), lr=0.001)
+    for epoch in range(10):
+        food_model.train()
+        for images, labels in train_loader:
+            optimizer.zero_grad()
+            outputs = food_model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-    #if exist_model:
-    #    validate_images_by_folder('test_images')
-    #    validate_images_by_folder('train_images')
-    #if len(data_loader.trains_absent_list) > 0 and exist_dataset_db:
-    #    new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'train_images')
-    #    add_files_to_database(new_files_dict, data_collector, True)
-    #if len(data_loader.test_absent_list) > 0 and exist_dataset_db:
-    #    new_files_dict = download_absent_data_for_classes(data_loader.trains_absent_list, 'test_images')
-    #    add_files_to_database(new_files_dict, data_collector, False)
-    #if not exist_dataset_db:
-    #    download_absent_data_for_classes(limit_downloaded_train_images, 'train_images')
-    #    download_absent_data_for_classes(limit_downloaded_test_images, 'test_images')
-    #    init_database(data_collector)
-    #main()
+        # Валидация
+        food_model.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for images, labels in test_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = food_model(images)
+                _, predicted = torch.max(outputs, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+        print(f'Epoch {epoch + 1}, Test Accuracy: {100 * correct / total:.2f}%')

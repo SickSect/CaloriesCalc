@@ -26,7 +26,7 @@ def fill_list_on_init():
         product_lists.append(product)
     log('info',f"Проинициализированы необходимые словари и списки для работы:\nproduct_lists: {product_lists} \nproduct_classes_idx:{product_classes_idx}\nfood_mapping:{food_mapping}")
 
-class DataLoader:
+class CustomDataLoader:
     def __init__(self, train_limit, test_limit):
         json_path = os.path.join(os.path.dirname(__file__), 'products.json')
         with open(json_path, "r", encoding="utf-8") as f:
@@ -57,7 +57,8 @@ class DataLoader:
                 elif num_files < limit:
                     log('debug',f"В папке {product_dir_path} не хватает {limit - num_files} файлов по классу {product}")
                     absent_list[product] = limit - num_files
-                log('debug',f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")
+                else:
+                    log('debug',f"В папке кол-во данных соответствует необходимому лимиту по классу {product}")
             else:
                 log('debug',f"В папке {folder} нет файлов по классу {product}")
                 absent_list[product] = limit
