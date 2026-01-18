@@ -332,12 +332,12 @@ if __name__ == "__main__":
     print('LEN TEST', len(data_loader.test_absent_list))
     print('KEYS TEST:', data_loader.test_absent_list.keys())
     exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
-    if len(data_loader.trains_absent_list) > 0 and exist_dataset_db:
+    if len(data_loader.trains_absent_list) > 0 and not exist_dataset_db:
         download_data_to_folder(data_loader.trains_absent_list, 'train_images')
-    save_image_to_db_by_folder('train_images', data_collector)
-    if len(data_loader.test_absent_list) > 0 and exist_dataset_db:
+        save_image_to_db_by_folder('train_images', data_collector)
+    if len(data_loader.test_absent_list) > 0 and not exist_dataset_db:
         download_data_to_folder(data_loader.test_absent_list, 'test_images')
-    save_image_to_db_by_folder('test_images', data_collector)
+        save_image_to_db_by_folder('test_images', data_collector)
     # Создание датасетов
     train_dataset = ImageFolder(root='ml/loader/train_images', transform=food_model.train_transform)
     test_dataset = ImageFolder(root='ml/loader/test_images', transform=food_model.val_transform)
@@ -361,6 +361,7 @@ if __name__ == "__main__":
     print(torch.cuda.is_available())  # False
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     log('info', f'DEVICE: {device}')
+    food_model = food_model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(food_model.parameters(), lr=0.001)
     for epoch in range(10):

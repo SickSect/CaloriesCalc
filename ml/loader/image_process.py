@@ -62,7 +62,6 @@ def download_data_to_folder(absent_dict, folder_name, max_workers=4):
 def save_image_to_db_by_folder(folder_name, collector):
     root_path = os.path.join(os.path.dirname(__file__), folder_name)
     files = []
-    print("Тип Image:", type(Image))  # Должно быть: <class 'type'>
     # Собираем внутри папки все файлы
     log('info', f'Start saving images in {folder_name}')
     for item in os.listdir(root_path):
@@ -76,8 +75,20 @@ def save_image_to_db_by_folder(folder_name, collector):
                     try:
                         with PIL.Image.open(file_path) as img:
                             img.verify()
+                        with PIL.Image.open(file_path) as img:
+                            if img.mode != 'RGB':
+                                background = PIL.Image.new('RGB', img.size, (255, 255, 255))
+                                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                                img = background
+                            elif img.mode == 'P':
+                                img = img.convert('RGB')
+                            else:
+                                img = img.convert('RGB')
+                            img.save(file_path.replace(filename, f'rgb_{filename}'), 'JPEG', quality=95)
+                            img.close()
                     except Exception as e:
                         log('info', f"❌ Пропущено изображение {file_path}: {e}")
+                        os.remove(file_path)
                         continue  # пропускаем битые файлы
                     collector.save_food_image_by_path(folder_name=='train_images', file_path, 'system_image_adding', 0, item)
                     files.append(file_path)
