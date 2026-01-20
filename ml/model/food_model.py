@@ -1,3 +1,8 @@
+import os
+
+import PIL
+import torch
+from PIL.Image import Image
 from torch import nn
 from torchvision.transforms import transforms
 
@@ -5,6 +10,8 @@ from torchvision.transforms import transforms
 class FoodNet(nn.Module):
     def __init__(self, num_classes=10):
         super().__init__()
+        self.is_trained = False
+        self.device = torch.device('cuda')
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
@@ -38,3 +45,33 @@ class FoodNet(nn.Module):
         x = self.dropout(self.relu(self.fc1(x)))
         x = self.fc2(x)
         return x
+
+    def predict(self, image_path, model):
+        try:
+            # Проверяем существование файла
+            if not os.path.exists(image_path):
+                return {'success': False, 'error': 'Файл не найден'}
+
+            # Загружаем и предобрабатываем изображение
+            image = PIL.Image.open(image_path).convert('RGB')
+
+            input_tensor = self.val_transform(image).unsqueeze(0).to(self.device)
+
+            # Делаем предсказание
+            with torch.no_grad():
+                output = model(input_tensor)
+                probabilities = torch.softmax(output, dim=1)
+                confidence, predicted_idx = torch.max(probabilities, dim=1)
+
+                predicted_class = self.class_names[predicted_idx.item()]
+                confidence_percent = round(confidence.item() * 100, 2)
+
+            return {
+                'success': True,
+                'food_class': predicted_class,
+                'confidence': confidence_percent,
+                'message': 'Успешно распознано!'
+            }
+
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
