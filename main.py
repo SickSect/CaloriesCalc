@@ -1,14 +1,10 @@
 import os
 from datetime import datetime
 
-import torch
 from dotenv import load_dotenv
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, MessageHandler, filters, ContextTypes, \
     ConversationHandler
-from torch import nn, optim
-from torch.utils.data import DataLoader
-from torchvision.datasets import ImageFolder
 
 from bot.db import Database
 from bot.str_utils import print_help_info, multiply_calories
@@ -18,7 +14,8 @@ from ml.loader.data_loader import fill_list_on_init, CustomDataLoader, get_json_
 from ml.loader.image_process import download_data_to_folder
 
 from ml.loader.image_process import save_image_to_db_by_folder
-from ml.model.food_model import FoodNet
+from ml.food_model import FoodNet
+from ml.model.train import train_model
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -338,56 +335,7 @@ if __name__ == "__main__":
     if len(data_loader.test_absent_list) > 0 and not exist_dataset_db:
         download_data_to_folder(data_loader.test_absent_list, 'test_images')
         save_image_to_db_by_folder('test_images', data_collector)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    log('info', f'DEVICE: {device}')
     if not os.path.exists(os.path.join('food_model_full.pth')):
-        print('FOOD MODEL NOT FOUND')
-        # Создание датасетов
-        train_dataset = ImageFolder(root='ml/loader/train_images', transform=food_model.train_transform)
-        test_dataset = ImageFolder(root='ml/loader/test_images', transform=food_model.val_transform)
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False, num_workers=4)
-        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4)
-        # Вывод и изменение слоя в модели
-        train_num_classes = len(train_dataset.classes)
-        print("Классы:", train_dataset.classes)  # ['яблоко', 'банан', ...]
-        print("Число классов:", train_num_classes)
-        test_num_classes = len(test_dataset.classes)
-        print("Классы:", test_dataset.classes)  # ['яблоко', 'банан', ...]
-        print("Число классов:", test_num_classes)
-        food_model.fc2 = nn.Linear(in_features=512, out_features=train_num_classes)
-        # Обучение
-        print("CUDA доступна:", torch.cuda.is_available())
-        print("Версия CUDA:", torch.version.cuda)
-        print("Число GPU:", torch.cuda.device_count())
-        print(torch.__version__)  # 2.9.1
-        print(torch.version.cuda)  # None ← вот ключ!
-        print(torch.cuda.is_available())  # False
-        food_model = food_model.to(device)
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(food_model.parameters(), lr=0.001)
-        for epoch in range(10):
-            food_model.train()
-            for images, labels in train_loader:
-                images = images.to(device)
-                labels = labels.to(device)
-                optimizer.zero_grad()
-                outputs = food_model(images)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-
-            # Валидация
-            food_model.eval()
-            correct = 0
-            total = 0
-            with torch.no_grad():
-                for images, labels in test_loader:
-                    images, labels = images.to(device), labels.to(device)
-                    outputs = food_model(images)
-                    _, predicted = torch.max(outputs, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
-            print(f'Epoch {epoch + 1}, Test Accuracy: {100 * correct / total:.2f}%')
-        torch.save(food_model, 'food_model_full.pth')
-    food_model.is_trained = True
+        train_model(food_model, food_model.device)
     main()
+

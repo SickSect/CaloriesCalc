@@ -3,7 +3,9 @@ import os
 import PIL
 import torch
 from PIL.Image import Image
-from torch import nn
+from torch import nn, optim
+from torch.utils.data import DataLoader
+from torchvision.datasets import ImageFolder
 from torchvision.transforms import transforms
 
 
@@ -11,7 +13,7 @@ class FoodNet(nn.Module):
     def __init__(self, num_classes=10):
         super().__init__()
         self.is_trained = False
-        self.device = torch.device('cuda')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
@@ -47,6 +49,7 @@ class FoodNet(nn.Module):
         return x
 
     def predict(self, image_path, model):
+
         try:
             # Проверяем существование файла
             if not os.path.exists(image_path):
@@ -55,8 +58,20 @@ class FoodNet(nn.Module):
             # Загружаем и предобрабатываем изображение
             image = PIL.Image.open(image_path).convert('RGB')
 
-            input_tensor = self.val_transform(image).unsqueeze(0).to(self.device)
+            print("=== ОТЛАДКА УСТРОЙСТВ ===")
+            print(f"Модель на устройстве: {next(model.parameters()).device}")
+            print(f"Устройство по умолчанию: {self.device}")
 
+            # ... загрузка изображения ...
+            input_tensor = self.val_transform(image).unsqueeze(0)
+            print(f"Изображение до переноса: {input_tensor.device}")
+
+            input_tensor = input_tensor.to(self.device)
+            print(f"Изображение после переноса: {input_tensor.device}")
+            print("=== КОНЕЦ ОТЛАДКИ ===")
+
+            input_tensor = self.val_transform(image).unsqueeze(0).to(self.device)
+            print(f'DEVICE: {self.device}')
             # Делаем предсказание
             with torch.no_grad():
                 output = model(input_tensor)
