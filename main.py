@@ -20,7 +20,7 @@ from ml.model.train import train_model
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
-fill_list_on_init()
+
 food_model = FoodNet()
 data_collector = DataCollector()
 limit_downloaded_train_images = get_json_config("train_product_limit")
@@ -324,6 +324,7 @@ def main():
 if __name__ == "__main__":
     # init db
     # Download
+    fill_list_on_init()
     print('LEN TRAIN:', len(data_loader.trains_absent_list))
     print('KEYS TRAIN:', data_loader.trains_absent_list.keys())
     print('LEN TEST', len(data_loader.test_absent_list))
