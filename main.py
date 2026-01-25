@@ -1,10 +1,12 @@
 import os
 from datetime import datetime
 
+import torch
 from dotenv import load_dotenv
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext, MessageHandler, filters, ContextTypes, \
     ConversationHandler
+from torchvision.datasets import ImageFolder
 
 from bot.db import Database
 from bot.str_utils import print_help_info, multiply_calories
@@ -15,13 +17,13 @@ from ml.loader.image_process import download_data_to_folder
 
 from ml.loader.image_process import save_image_to_db_by_folder
 from ml.food_model import FoodNet
+from ml.model.predictor import Predictor
 from ml.model.train import train_model
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 db = Database()
-
-food_model = FoodNet()
+predictor = None
 data_collector = DataCollector()
 limit_downloaded_train_images = get_json_config("train_product_limit")
 limit_downloaded_test_images = get_json_config("test_product_limit")
@@ -208,13 +210,6 @@ async def add_calories_for_today(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def start_predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not food_model.is_trained:
-        await update.message.reply_text(
-            "❌ Модель ещё не обучена!\n"
-            "💡 Сначала соберите данные и обучите модель.",
-            reply_markup=main_keyboard
-        )
-        return
     await update.message.reply_text("📸 Пришлите фото еды для добавления в датасет")
     log('info',"Ожидание фото...")
     return PHOTO
@@ -232,7 +227,7 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await file.download_to_drive(temp_path)
 
         # Предсказываем
-        result = food_model.predict(temp_path, food_model)
+        result = predictor.predict(temp_path, predictor.model)
 
         # Удаляем временный файл
         if os.path.exists(temp_path):
@@ -255,41 +250,6 @@ async def predict_food(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_keyboard
         )
     return ConversationHandler.END
-
-# Добавляем команду для обучения модели
-async def train_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обучает модель на собранных данных"""
-    await update.message.reply_text("🧠 Проверяем возможность обучения...")
-
-    stats = data_collector.get_stats()
-
-    if not stats['can_train']:
-        response = (
-            f"❌ Недостаточно данных для обучения!\n"
-            f"📊 Собрано: {stats['trainable_samples']} фото\n"
-            f"🎯 Нужно: минимум 20 фото\n\n"
-            f"💡 Продолжайте отправлять фото еды с описаниями!"
-        )
-    else:
-        await update.message.reply_text("🎯 Начинаем обучение модели... Это займёт несколько минут.")
-
-        # Обучаем модель
-        success = food_model.train(data_collector, epochs=10)
-
-        if success:
-            response = (
-                f"✅ Модель успешно обучена!\n"
-                f"📊 Обучено на: {stats['trainable_samples']} фото\n"
-                f"🎯 Теперь я могу распознавать еду на фото!\n\n"
-                f"📈 Статистика по классам:\n"
-            )
-
-            for cls, count in stats['by_class'].items():
-                response += f"• {cls}: {count} фото\n"
-        else:
-            response = "❌ Не удалось обучить модель. Попробуйте позже."
-
-    await update.message.reply_text(response, reply_markup=main_keyboard)
 
 # --- Запуск бота ---
 def main():
@@ -325,18 +285,19 @@ if __name__ == "__main__":
     # init db
     # Download
     fill_list_on_init()
-    print('LEN TRAIN:', len(data_loader.trains_absent_list))
-    print('KEYS TRAIN:', data_loader.trains_absent_list.keys())
-    print('LEN TEST', len(data_loader.test_absent_list))
-    print('KEYS TEST:', data_loader.test_absent_list.keys())
-    exist_dataset_db = os.path.exists(os.path.join(os.path.dirname(__file__), "ml/food_dataset.db"))
-    if len(data_loader.trains_absent_list) > 0 and not exist_dataset_db:
-        download_data_to_folder(data_loader.trains_absent_list, 'train_images')
-        save_image_to_db_by_folder('train_images', data_collector)
-    if len(data_loader.test_absent_list) > 0 and not exist_dataset_db:
-        download_data_to_folder(data_loader.test_absent_list, 'test_images')
-        save_image_to_db_by_folder('test_images', data_collector)
-    if not os.path.exists(os.path.join('food_model_full.pth')):
+
+    if os.path.exists(os.path.join('food_model_weights.pth')):
+        train_dataset = ImageFolder(root='ml/loader/train_images')
+        predictor = Predictor(os.path.join('food_model_weights.pth'), train_dataset.classes)
+    else:
+        if len(data_loader.trains_absent_list) > 0:
+            download_data_to_folder(data_loader.trains_absent_list, 'train_images')
+            save_image_to_db_by_folder('train_images', data_collector)
+        if len(data_loader.test_absent_list) > 0:
+            download_data_to_folder(data_loader.test_absent_list, 'test_images')
+            save_image_to_db_by_folder('test_images', data_collector)
+        classes_num = len(ImageFolder(root='ml/loader/train_images').classes)
+        food_model = FoodNet(classes_num)
         train_model(food_model, food_model.device)
     main()
 
