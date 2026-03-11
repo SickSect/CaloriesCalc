@@ -1,3 +1,0 @@
-databaseChangeLog:
-  - include:
-      file: 001-create-user-preset-table.yml
