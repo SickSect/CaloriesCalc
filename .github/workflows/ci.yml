@@ -1,21 +1,17 @@
 name: QA Automation CI
 
-# Когда запускать workflow
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
 
-# Задачи (jobs)
 jobs:
   test:
-    # На какой ОС запускать
     runs-on: ubuntu-latest
 
-    # Шаги выполнения
     steps:
-      # 1. Скачиваем код из репозитория
+      # 1. Скачиваем код
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
@@ -25,14 +21,31 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Устанавливаем зависимости
+      # 3. Кэшируем зависимости (ускоряет сборку)
+      - name: 💾 Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # 4. Устанавливаем зависимости
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      # 4. Запускаем тесты
-      - name: 🧪 Run tests
+      # 5. Запускаем тесты
+      - name: 🧪 Run tests with coverage
         run: |
-          pytest -v --cov=bot --cov=core --cov-report=xml
+          pytest -v --cov=bot --cov=core --cov-report=xml --cov-report=html
+
+      # 6. Сохраняем отчет о покрытии
+      - name: 📊 Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 7
