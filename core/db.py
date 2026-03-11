@@ -17,7 +17,7 @@ class Database:
         """Возвращает соединение с БД (для удобного мокирования в тестах)"""
         return sqlite3.connect(self.db_path)
 
-    def init_db(self):
+    def init_db(self, skip_init_data: bool = False):
         """Инициализация таблиц"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -50,7 +50,10 @@ class Database:
                 )
             ''')
 
-            self._init_products_table(cursor)
+            # 👇 ДОБАВЬ ЭТО УСЛОВИЕ (было просто self._init_products_table(cursor))
+            if not skip_init_data:
+                self._init_products_table(cursor)
+
             conn.commit()
 
     def _init_products_table(self, cursor: sqlite3.Cursor):
