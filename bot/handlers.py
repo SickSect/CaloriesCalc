@@ -8,8 +8,8 @@ from telegram.ext import (
     ConversationHandler
 )
 
-from bot.keyboards import Keyboards
 from bot.states import DialogState
+from bot.keyboards import Keyboards
 from core.calculator import CalorieCalculator
 from core.db import Database
 from core.str_utils import send_card, print_daily_report
@@ -194,6 +194,31 @@ class BotHandlers:
         )
         return ConversationHandler.END
 
+    async def add_calories_for_today(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка ввода калорийности для нового продукта"""
+        text_input = update.message.text.strip()
+
+        validation: ValidationResult = InputValidator.validate_calories(text_input)
+        if not validation.is_valid:
+            await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
+            return DialogState.SET_TODAY_CALORIES
+
+        calories = int(text_input)
+        context.user_data["calories_per_hundred"] = calories
+
+        # Добавляем продукт в базу
+        self.db.add_product(context.user_data["product_name"], calories)
+
+        await send_card(
+            update,
+            context,
+            title="Ввод веса",
+            fields=[("⚖️", "Введите вес продукта:")],
+            footer="Для отмены используйте кнопку ниже ⬇️",
+            keyboard=Keyboards.get_cancel_keyboard()
+        )
+        return DialogState.SET_PRODUCT_WEIGHT
+
     async def start_new_product_adding(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Начало добавления нового продукта в базу"""
         await send_card(
@@ -209,6 +234,12 @@ class BotHandlers:
     async def start_new_product_calories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Ввод калорийности нового продукта"""
         product_name_input = update.message.text
+
+        validation: ValidationResult = InputValidator.validate_product_name(product_name_input)
+        if not validation.is_valid:
+            await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
+            return DialogState.SET_NEW_PRODUCT_CALORIES
+
         context.user_data["product_name_input"] = product_name_input
 
         await send_card(
@@ -253,8 +284,15 @@ class BotHandlers:
         )
         return ConversationHandler.END
 
+    async def handle_cancel_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка нажатия кнопки отмены"""
+        return await self.cancel(update, context)
+
     def get_conversation_handler(self) -> ConversationHandler:
         """Создание ConversationHandler"""
+        # Regex паттерн для кнопки отмены
+        cancel_pattern = r"^(❌ Отмена|Отмена)$"
+
         return ConversationHandler(
             entry_points=[
                 MessageHandler(
@@ -272,22 +310,34 @@ class BotHandlers:
             ],
             states={
                 DialogState.SET_CALORIES: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.set_calories)
+                    # ВАЖНО: Сначала отмена, потом основной хендлер!
+                    MessageHandler(filters.Regex(cancel_pattern), self.handle_cancel_button),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.set_calories),
                 ],
                 DialogState.SET_PRODUCT_NAME: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.set_product_name)
+                    # ВАЖНО: Сначала отмена, потом основной хендлер!
+                    MessageHandler(filters.Regex(cancel_pattern), self.handle_cancel_button),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.set_product_name),
                 ],
                 DialogState.SET_PRODUCT_WEIGHT: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.set_product_weight)
+                    # ВАЖНО: Сначала отмена, потом основной хендлер!
+                    MessageHandler(filters.Regex(cancel_pattern), self.handle_cancel_button),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.set_product_weight),
                 ],
                 DialogState.SET_TODAY_CALORIES: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.set_product_weight)
+                    # ВАЖНО: Сначала отмена, потом основной хендлер!
+                    MessageHandler(filters.Regex(cancel_pattern), self.handle_cancel_button),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.add_calories_for_today),
                 ],
                 DialogState.SET_NEW_PRODUCT_CALORIES: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.start_new_product_calories)
+                    # ВАЖНО: Сначала отмена, потом основной хендлер!
+                    MessageHandler(filters.Regex(cancel_pattern), self.handle_cancel_button),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.start_new_product_calories),
                 ],
                 DialogState.SAVE_NEW_PRODUCT: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.save_new_product)
+                    # ВАЖНО: Сначала отмена, потом основной хендлер!
+                    MessageHandler(filters.Regex(cancel_pattern), self.handle_cancel_button),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.save_new_product),
                 ],
             },
             fallbacks=[CommandHandler('cancel', self.cancel)],
