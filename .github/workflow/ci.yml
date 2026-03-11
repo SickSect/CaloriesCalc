@@ -1,0 +1,16 @@
+name: Hello World CI
+
+on: [push]
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🖐️ Say hello
+        run: echo "Hello from GitHub Actions! 🚀"
+
+      - name: 🐍 Check Python
+        run: |
+          echo "Python version:"
+          python3 --version

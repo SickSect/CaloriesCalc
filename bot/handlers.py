@@ -88,6 +88,11 @@ class BotHandlers:
     async def set_calories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка ввода суточных калорий"""
         user_id = update.effective_user.id
+
+        # ← ДОБАВЬ: создаём пользователя, если нет
+        if not self.db.check_user_exists(user_id):
+            self.db.add_user(user_id)
+
         text_input = update.message.text
 
         validation: ValidationResult = InputValidator.validate_calories(text_input)
