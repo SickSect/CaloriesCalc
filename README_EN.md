@@ -141,6 +141,7 @@ pip install -r requirements.txt
 # 4. Set up bot token
 # Create a .env file with:
 BOT_TOKEN=123456789:AAHdqTcvCH1vGWJxfSeofSAswK5PALnAt
+LOG_LEVEL=INFO
 
 # 5. Run the bot
 python bot/main.py

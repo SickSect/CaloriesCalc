@@ -141,6 +141,7 @@ pip install -r requirements.txt
 ### 4. Токен бота
 Создай файл `.env`:
 BOT_TOKEN=123456:AAH...
+LOG_LEVEL=INFO 
 
 ### 5. Запуск
 python bot/main.py```
