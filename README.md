@@ -1,22 +1,23 @@
-# 🥗 FoodCalorieBot — Telegram Bot for Calorie Tracking
+# 🥗 FoodCalorieBot — Telegram Calorie Tracker with AI Advisor
 
-[![Tests](https://github.com/YOUR_USERNAME/CaloriesCalc/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/CaloriesCalc/actions)
+[![Tests](https://github.com/SickSect/CaloriesCalc/actions/workflows/ci.yml/badge.svg)](https://github.com/SickSect/CaloriesCalc/actions)
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-> **QA Automation Pet Project** — demonstrating testing, refactoring, and CI/CD skills through a working Telegram bot.
+> A Telegram bot for tracking daily nutrition with a local AI advisor powered by Ollama. No external AI APIs — everything runs on your machine.
 
 ---
 
 ## 📖 Overview
 
-FoodCalorieBot is a Telegram bot for tracking daily calorie intake with AI-powered food recognition from photos. This project showcases:
+FoodCalorieBot helps you track what you eat, stay within your calorie goal, and get personalized nutrition advice from a local LLM. The bot is live and running — you can try it right now.
 
-✅ **Clean Architecture** (layered separation: handlers, core, ml)  
-✅ **85%+ Test Coverage** (Unit + Integration tests)  
-✅ **CI/CD Pipeline** (automated test execution on push)  
-✅ **Mocking External Dependencies** (Telegram API, SQLite)  
-✅ **Async Testing** (pytest-asyncio)
+**What makes this project interesting:**
+
+- 🤖 **Local AI integration** — Ollama + LLaMA 3 for nutrition analysis, no API keys needed
+- 🧪 **85%+ test coverage** — unit and integration tests with mocked Telegram API
+- ⚡ **Fully async** — built on `python-telegram-bot` v22 with `asyncio`
+- 🔄 **CI/CD** — GitHub Actions runs tests on every push
 
 ---
 
@@ -24,126 +25,138 @@ FoodCalorieBot is a Telegram bot for tracking daily calorie intake with AI-power
 
 | Feature | Description |
 |---------|-------------|
-| 📅 Daily Calorie Limit | Set daily goals, get notifications when exceeded |
-| ➕ Add Food Entries | Calculate calories based on product weight |
-| 🔥 Daily Statistics | View consumed calories and food log for today |
-| 🍗 Product Catalog | Add and search custom products in database |
-| 📸 Food Recognition | Predict food type from photo using ML |
-| 🧠 Model Training | Auto-collect dataset and fine-tune CNN model |
+| 📅 Daily calorie limit | Set your daily goal, get notified when exceeded |
+| ➕ Food log | Add meals with weight, calories calculated automatically |
+| 🔥 Daily stats | View calories consumed and full food log for today |
+| 🍗 Product catalog | Add and search custom products in local database |
+| 🧠 AI advisor | Ask the local LLM to analyze your diet and suggest improvements |
 
 ---
 
 ## 🛠 Tech Stack
 
-### Core Technologies
-
-```angular2html
-┌─────────────────────────────────────┐
-│ 🤖 Bot Framework │ python-telegram-bot v22 │
-│ 🗄 Database │ SQLite │
-│ 🧠 ML │ PyTorch, torchvision │
-│ 🔧 Testing │ pytest, pytest-asyncio │
-│ 🔄 CI/CD │ GitHub Actions │
-│ 📊 Coverage │ pytest-cov, Codecov │
-└─────────────────────────────────────┘
-```
-
-
-### Dependencies & Licenses
-
-| Library | Purpose | License |
-|---------|---------|---------|
-| `python-telegram-bot` | Telegram Bot API | LGPLv3 |
-| `python-dotenv` | Environment variable management | MIT |
-| `pytest` + plugins | Testing framework | MIT |
-| `PyTorch` | ML model framework | BSD-3 |
-| `torchvision` | Pre-trained models & transforms | BSD-3 |
-| `Pillow` | Image processing | HPND |
-| `pymorphy3` | Russian text lemmatization | Apache 2.0 |
+| Layer | Technology |
+|-------|------------|
+| Bot framework | `python-telegram-bot` v22 |
+| Database | SQLite (via JDBC-style abstraction) |
+| AI | Ollama + LLaMA 3.2 (local) |
+| HTTP client | `httpx` (async) |
+| Testing | `pytest`, `pytest-asyncio`, `pytest-cov` |
+| CI/CD | GitHub Actions |
+| Text processing | `pymorphy3` (Russian lemmatization) |
 
 ---
 
 ## 📁 Project Structure
 
-```angular2html
+```
 CaloriesCalc/
 ├── bot/
-│ ├── main.py # Entry point
-│ ├── handlers.py # Command handlers (with Dependency Injection)
-│ ├── keyboards.py # Keyboard factory
-│ ├── states.py # Dialog state Enum
-│ └── str_utils.py # Helper utilities
+│   ├── main.py           # Entry point, app builder
+│   ├── handlers.py       # Command handlers (Dependency Injection)
+│   ├── keyboards.py      # Keyboard factory
+│   └── states.py         # Dialog state enum
 ├── core/
-│ ├── database.py # SQLite operations (testable)
-│ ├── calculator.py # Business logic for calculations
-│ └── validator.py # User input validation
-├── ml/
-│ ├── food_model.py # CNN model for food recognition
-│ ├── dataset_collector.py # Dataset collection & labeling
-│ └── data_loader.py # Data loading & augmentation
+│   ├── db.py             # SQLite operations
+│   ├── calculator.py     # Calorie calculation logic
+│   ├── validator.py      # User input validation
+│   └── str_utils.py      # Message formatting helpers
+├── ai/
+│   └── advisor.py        # Ollama integration, prompt builder
 ├── tests/
-│ ├── conftest.py # Shared fixtures (DB, mocks)
-│ ├── test_calculator.py # Unit tests for business logic
-│ ├── test_validator.py # Unit tests for input validation
-│ ├── test_database.py # DB tests with temporary files
-│ └── test_handlers.py # Integration tests with Telegram API mocks
+│   ├── conftest.py       # Shared fixtures (in-memory DB, mocks)
+│   ├── test_calculator.py
+│   ├── test_validator.py
+│   ├── test_db.py
+│   └── test_handlers.py  # Integration tests with mocked Telegram API
 ├── .github/workflows/
-│ └── ci.yml # CI/CD pipeline (GitHub Actions)
-├── requirements.txt # Production dependencies
-├── requirements-dev.txt # Development & testing dependencies
-├── .gitignore # Ignored files
-└── README.md # This file
+│   └── ci.yml            # GitHub Actions pipeline
+├── requirements.txt
+├── requirements-dev.txt
+└── .env.example
 ```
 
+---
+
+## ⚡ Quick Start
+
+### Requirements
+
+- Python 3.11+
+- [Ollama](https://ollama.com) installed and running
+- Telegram bot token from [@BotFather](https://t.me/BotFather)
+
+### 1. Clone and set up
+
+```bash
+git clone https://github.com/SickSect/CaloriesCalc.git
+cd CaloriesCalc
+
+python -m venv .venv
+.venv\Scripts\activate      # Windows
+# source .venv/bin/activate  # Linux/macOS
+
+pip install -r requirements.txt
+```
+
+### 2. Configure
+
+```bash
+cp .env.example .env
+# Edit .env and set your BOT_TOKEN
+```
+
+```env
+BOT_TOKEN=123456789:AAH...
+LOG_LEVEL=INFO
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+```
+
+### 3. Pull the AI model
+
+```bash
+ollama pull llama3.2
+```
+
+### 4. Run
+
+```bash
+python bot/main.py
+```
 
 ---
 
 ## 🧪 Testing
 
-### Running Tests
-
 ```bash
-# Install development dependencies
-pip install -r requirements.txt
+# Install dev dependencies
 pip install -r requirements-dev.txt
 
-# Run all tests with verbose output
+# Run all tests
 pytest -v
 
-# Run with coverage report
-pytest --cov=bot --cov=core --cov-report=html
+# With coverage report
+pytest --cov=bot --cov=core --cov-report=term-missing
 
-# Open coverage report in browser (Windows)
-start htmlcov/index.html
-
-# Run only handler tests
-pytest tests/test_handlers.py -v
-
-# Run with mocks and debug output
-pytest -v -s --cov=bot --cov-report=term-missing
+# Only unit tests
+pytest tests/test_calculator.py tests/test_validator.py -v
 ```
 
-## 🚀 Quick Start
+Tests use in-memory SQLite and mocked Telegram API — no real bot token needed.
 
-```angular2html
-# 1. Clone repository
-git clone https://github.com/YOUR_USERNAME/CaloriesCalc.git
-cd CaloriesCalc
+---
 
-# 2. Create virtual environment
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/macOS
+## 🔮 Roadmap
 
-# 3. Install dependencies
-pip install -r requirements.txt
+- [ ] КБЖУ tracking (proteins, fats, carbs) alongside calories
+- [ ] Weekly statistics and progress summary
+- [ ] Food photo recognition via Ollama vision model (LLaVA)
+- [ ] PostgreSQL support for multi-user deployments
+- [ ] Docker Compose setup
 
-# 4. Set up bot token
-# Create a .env file with:
-BOT_TOKEN=123456789:AAHdqTcvCH1vGWJxfSeofSAswK5PALnAt
-LOG_LEVEL=INFO
+---
 
-# 5. Run the bot
-python bot/main.py
-```
+## 📄 License
 
+MIT — see [LICENSE](LICENSE)

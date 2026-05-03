@@ -1,148 +1,162 @@
-# 🥗 FoodCalorieBot — Telegram-бот для учёта калорий
+# 🥗 FoodCalorieBot — Telegram-бот для трекинга питания с AI-советником
 
 [![Tests](https://github.com/YOUR_USERNAME/CaloriesCalc/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/CaloriesCalc/actions)
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-> **QA Automation Pet Project** — демонстрация навыков тестирования, рефакторинга и CI/CD на примере работающего Telegram-бота.
+> Telegram-бот для трекинга калорий с локальным AI-советником на базе Ollama. Без внешних API — всё работает на твоей машине.
 
 ---
 
 ## 📖 Описание
 
-FoodCalorieBot — это Telegram-бот для подсчета калорий с функцией распознавания еды по фото. Проект демонстрирует:
+FoodCalorieBot помогает следить за питанием, не выходить за рамки дневной нормы и получать персональные рекомендации от локальной языковой модели. Бот живой — можно зайти и попробовать прямо сейчас.
 
-✅ **Чистую архитектуру** (разделение на слои: handlers, core, ml)  
-✅ **Покрытие тестами 85%+** (Unit + Integration)  
-✅ **CI/CD пайплайн** (автозапуск тестов при push)  
-✅ **Мокирование внешних зависимостей** (Telegram API, SQLite)  
-✅ **Асинхронное тестирование** (pytest-asyncio)
+**Что интересного в проекте:**
+
+- 🤖 **Локальный AI** — Ollama + LLaMA 3 для анализа рациона, без API-ключей
+- 🧪 **Покрытие тестами 85%+** — unit и integration тесты с моками Telegram API
+- ⚡ **Полностью async** — `python-telegram-bot` v22 на базе `asyncio`
+- 🔄 **CI/CD** — GitHub Actions запускает тесты при каждом пуше
 
 ---
 
-## 🚀 Возможности бота
+## 🚀 Возможности
 
 | Функция | Описание |
 |---------|----------|
-| 📅 Лимит калорий | Установка дневной нормы, уведомления о превышении |
-| ➕ Добавление еды | Расчет калорий по весу продукта |
-| 🔥 Статистика | Просмотр съеденных калорий за день |
-| 🍗 Каталог продуктов | Добавление и поиск продуктов в базе |
-| 📸 Распознавание еды | Предсказание продукта по фото (ML) |
-| 🧠 Обучение модели | Авто-сбор датасета и дообучение CNN |
+| 📅 Дневной лимит | Установи норму калорий, получай уведомления при превышении |
+| ➕ Журнал еды | Добавляй приёмы пищи с весом, калории считаются автоматически |
+| 🔥 Статистика дня | Просмотр съеденных калорий и полного списка за день |
+| 🍗 Каталог продуктов | Добавление и поиск продуктов в локальной базе |
+| 🧠 AI-советник | Попроси локальную LLM проанализировать твой рацион и дать рекомендации |
 
 ---
 
 ## 🛠 Технологический стек
 
-### Основные технологии
-
-```angular2html
-┌─────────────────────────────────────┐
-│ 🤖 Bot Framework │ python-telegram-bot v22 │
-│ 🗄 Database │ SQLite │
-│ 🧠 ML │ PyTorch, torchvision │
-│ 🔧 Testing │ pytest, pytest-asyncio │
-│ 🔄 CI/CD │ GitHub Actions │
-│ 📊 Coverage │ pytest-cov, Codecov │
-└─────────────────────────────────────┘
-```
-
-
-### Зависимости и лицензии
-
-| Библиотека | Назначение | Лицензия |
-|------------|------------|----------|
-| `python-telegram-bot` | Telegram Bot API | LGPLv3 |
-| `python-dotenv` | Управление переменными окружения | MIT |
-| `pytest` + плагины | Тестирование | MIT |
-| `PyTorch` | ML-модель | BSD-3 |
-| `torchvision` | Претренированные модели | BSD-3 |
-| `Pillow` | Обработка изображений | HPND |
-| `pymorphy3` | Лемматизация русского текста | Apache 2.0 |
+| Слой | Технология |
+|------|------------|
+| Bot framework | `python-telegram-bot` v22 |
+| База данных | SQLite |
+| AI | Ollama + LLaMA 3.2 (локально) |
+| HTTP-клиент | `httpx` (async) |
+| Тестирование | `pytest`, `pytest-asyncio`, `pytest-cov` |
+| CI/CD | GitHub Actions |
+| Обработка текста | `pymorphy3` (лемматизация русского) |
 
 ---
 
 ## 📁 Структура проекта
 
-```angular2html
+```
 CaloriesCalc/
 ├── bot/
-│ ├── main.py # Точка входа
-│ ├── handlers.py # Обработчики команд (с Dependency Injection)
-│ ├── keyboards.py # Фабрика клавиатур
-│ ├── states.py # Enum состояний диалога
-│ └── str_utils.py # Вспомогательные функции
+│   ├── main.py           # Точка входа, сборка приложения
+│   ├── handlers.py       # Обработчики команд (Dependency Injection)
+│   ├── keyboards.py      # Фабрика клавиатур
+│   └── states.py         # Enum состояний диалога
 ├── core/
-│ ├── database.py # Работа с SQLite (тестируемая)
-│ ├── calculator.py # Бизнес-логика расчётов
-│ └── validator.py # Валидация пользовательского ввода
-├── ml/
-│ ├── food_model.py # CNN модель для распознавания
-│ ├── dataset_collector.py # Сбор и разметка датасета
-│ └── data_loader.py # Загрузка и аугментация данных
+│   ├── db.py             # Работа с SQLite
+│   ├── calculator.py     # Логика расчёта калорий
+│   ├── validator.py      # Валидация пользовательского ввода
+│   └── str_utils.py      # Форматирование сообщений
+├── ai/
+│   └── advisor.py        # Интеграция с Ollama, построение промптов
 ├── tests/
-│ ├── conftest.py # Общие фикстуры (БД, моки)
-│ ├── test_calculator.py # Unit-тесты на логику
-│ ├── test_validator.py # Unit-тесты на валидацию
-│ ├── test_database.py # Тесты БД с временными файлами
-│ └── test_handlers.py # Integration-тесты с моками Telegram
+│   ├── conftest.py       # Общие фикстуры (БД в памяти, моки)
+│   ├── test_calculator.py
+│   ├── test_validator.py
+│   ├── test_db.py
+│   └── test_handlers.py  # Integration-тесты с моками Telegram API
 ├── .github/workflows/
-│ └── ci.yml # CI/CD пайплайн (GitHub Actions)
-├── requirements.txt # Основные зависимости
-├── requirements-dev.txt # Зависимости для тестов
-├── .gitignore # Исключаемые файлы
-└── README.md # Этот файл
+│   └── ci.yml            # GitHub Actions пайплайн
+├── requirements.txt
+├── requirements-dev.txt
+└── .env.example
 ```
 
+---
 
+## ⚡ Быстрый старт
+
+### Требования
+
+- Python 3.11+
+- [Ollama](https://ollama.com) установлена и запущена
+- Токен Telegram-бота от [@BotFather](https://t.me/BotFather)
+
+### 1. Клонирование и окружение
+
+```bash
+git clone https://github.com/YOUR_USERNAME/CaloriesCalc.git
+cd CaloriesCalc
+
+python -m venv .venv
+.venv\Scripts\activate      # Windows
+# source .venv/bin/activate  # Linux/macOS
+
+pip install -r requirements.txt
+```
+
+### 2. Настройка
+
+```bash
+cp .env.example .env
+# Открой .env и вставь свой BOT_TOKEN
+```
+
+```env
+BOT_TOKEN=123456789:AAH...
+LOG_LEVEL=INFO
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+```
+
+### 3. Скачать AI-модель
+
+```bash
+ollama pull llama3.2
+```
+
+### 4. Запуск
+
+```bash
+python bot/main.py
+```
 
 ---
 
 ## 🧪 Тестирование
 
-### Запуск тестов
-
 ```bash
 # Установить зависимости для разработки
-pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
-# Запустить все тесты с выводом подробностей
+# Запустить все тесты
 pytest -v
 
-# Запустить с отчетом о покрытии
-pytest --cov=bot --cov=core --cov-report=html
+# С отчётом о покрытии
+pytest --cov=bot --cov=core --cov-report=term-missing
 
-# Открыть отчет в браузере (Windows)
-start htmlcov/index.html
-
-# Запустить только тесты хендлеров
-pytest tests/test_handlers.py -v
-
-# Запустить с моками и отладкой
-pytest -v -s --cov=bot --cov-report=term-missing
+# Только unit-тесты
+pytest tests/test_calculator.py tests/test_validator.py -v
 ```
---
 
-## 🚀 Быстрый старт
+Тесты используют SQLite в памяти и мок Telegram API — реальный токен не нужен.
 
-`````### 1. Клонирование
-git clone https://github.com/YOU/CaloriesCalc.git
-cd CaloriesCalc
+---
 
-### 2. Виртуальное окружение
-python -m venv .venv
-.venv\Scripts\activate  # Windows
+## 🔮 Планы
 
-### 3. Зависимости
-pip install -r requirements.txt
+- [ ] Трекинг КБЖУ (белки, жиры, углеводы) помимо калорий
+- [ ] Недельная статистика и сводка прогресса
+- [ ] Распознавание еды по фото через Ollama vision (LLaVA)
+- [ ] Поддержка PostgreSQL для многопользовательских деплоев
+- [ ] Docker Compose для запуска одной командой
 
-### 4. Токен бота
-Создай файл `.env`:
-BOT_TOKEN=123456:AAH...
-LOG_LEVEL=INFO 
+---
 
-### 5. Запуск
-python bot/main.py```
+## 📄 Лицензия
 
+MIT — см. [LICENSE](LICENSE)
