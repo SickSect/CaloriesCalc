@@ -44,8 +44,8 @@ class BotHandlers:
     async def handle_start_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка кнопки 'Начать'"""
         user_id = update.effective_user.id
-        if not self.db.check_user_exists(user_id):
-            self.db.add_user(user_id)
+        if not await self.db.check_user_exists(user_id):
+            await self.db.add_user(user_id)
 
         await send_card(
             update,
@@ -59,11 +59,11 @@ class BotHandlers:
     async def handle_today_calories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Просмотр калорий за сегодня"""
         user_id = update.effective_user.id
-        if not self.db.check_user_exists(user_id):
-            self.db.add_user(user_id)
+        if not await self.db.check_user_exists(user_id):
+            await self.db.add_user(user_id)
 
-        report = self.db.get_today_calories(user_id)
-        limit = self.db.get_daily_limit(user_id)
+        report = await self.db.get_today_calories(user_id)
+        limit = await self.db.get_daily_limit(user_id)
 
         if report:
             text = print_daily_report(report)
@@ -90,8 +90,8 @@ class BotHandlers:
         user_id = update.effective_user.id
 
         # ← ДОБАВЬ: создаём пользователя, если нет
-        if not self.db.check_user_exists(user_id):
-            self.db.add_user(user_id)
+        if not await self.db.check_user_exists(user_id):
+            await self.db.add_user(user_id)
 
         text_input = update.message.text
 
@@ -109,7 +109,7 @@ class BotHandlers:
             return DialogState.SET_CALORIES
 
         calories = int(text_input)
-        self.db.set_daily_calories(user_id, calories)
+        await self.db.set_daily_calories(user_id, calories)
 
         await send_card(
             update,
@@ -144,8 +144,8 @@ class BotHandlers:
 
         context.user_data["product_name"] = text_input
 
-        if self.db.check_product_exists(text_input):
-            product_info = self.db.get_product_info(text_input)
+        if await self.db.check_product_exists(text_input):
+            product_info = await self.db.get_product_info(text_input)
             await update.message.reply_text(
                 f"🥦 <b>Информация о продукте</b>\n"
                 f"━━━━━━━━━━━━━━━\n"
@@ -180,7 +180,7 @@ class BotHandlers:
             weight
         )
 
-        self.db.add_calories_for_today(
+        await self.db.add_calories_for_today(
             update.effective_user.id,
             calories,
             context.user_data["product_name"]
@@ -212,7 +212,7 @@ class BotHandlers:
         context.user_data["calories_per_hundred"] = calories
 
         # Добавляем продукт в базу
-        self.db.add_product(context.user_data["product_name"], calories)
+        await self.db.add_product(context.user_data["product_name"], calories)
 
         await send_card(
             update,
@@ -266,7 +266,7 @@ class BotHandlers:
             await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
             return DialogState.SAVE_NEW_PRODUCT
 
-        self.db.add_product(
+        await self.db.add_product(
             context.user_data["product_name_input"],
             int(product_calories_input)
         )
