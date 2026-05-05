@@ -50,13 +50,14 @@ class Database:
         await self._init_products()
 
     async def _init_products(self):
-        """Заполняет таблицу products из JSON если она пустая"""
         async with self._pool.acquire() as conn:
             count = await conn.fetchval("SELECT COUNT(*) FROM products")
             if count > 0:
                 return
 
-            products = _load_json("products.json")
+            data = _load_json("products.json")
+            products = data["products_calories_per_hundred"]  # ← берём нужный ключ
+
             await conn.executemany(
                 "INSERT INTO products (product_name, calories_per_hundred) VALUES ($1, $2) ON CONFLICT DO NOTHING",
                 [(p["product"], p["calories_per_hundred"]) for p in products]
