@@ -12,3 +12,4 @@ class DialogState(IntEnum):
     PHOTO = 6
     SET_NEW_PRODUCT_CALORIES = 7
     SAVE_NEW_PRODUCT = 8
+    ASK_REQUEST = 9

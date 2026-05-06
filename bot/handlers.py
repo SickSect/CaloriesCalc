@@ -25,9 +25,10 @@ logger = logging.getLogger(__name__)
 class BotHandlers:
     """Обработчики команд с внедрением зависимостей"""
 
-    def __init__(self, db: Database, calculator: CalorieCalculator):
+    def __init__(self, db: Database, calculator: CalorieCalculator, llm: LLMService):
         self.db = db
         self.calculator = calculator
+        self.llm = llm
         self._locks: dict[int, asyncio.Lock] = {}
 
     def _lock(self, uid: int) -> asyncio.Lock:
@@ -85,8 +86,18 @@ class BotHandlers:
                 await update.message.reply_text("Сегодня калории не записаны",
                                                 reply_markup=Keyboards.get_main_keyboard())
 
-    async def ask_questions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+    async def handle_question(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        async with self._lock(user_id):
+            await send_card(
+                update,
+                context,
+                title="Ввод вопроса",
+                fields=[("🔥", "Пожалуйста, введите свой вопрос")],
+                footer="Для отмены используйте кнопку ниже ⬇️",
+                keyboard=Keyboards.get_cancel_keyboard()
+            )
+            return DialogState.ASK_REQUEST
 
     async def start_calories_setup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Начало установки суточных калорий"""
@@ -99,6 +110,21 @@ class BotHandlers:
             keyboard=Keyboards.get_cancel_keyboard()
         )
         return DialogState.SET_CALORIES
+
+    async def set_llm_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        async with self._lock(user_id):
+            text_input = update.message.text
+            result = await self.llm.ask(text_input)
+            await send_card(
+                update,
+                context,
+                title="Результат запрос",
+                fields=[("🔥", result)],
+                footer="Выберите следующее действие ⬇️",
+                keyboard=Keyboards.get_main_keyboard()
+            )
+            return ConversationHandler.END
 
     async def set_calories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка ввода суточных калорий"""
@@ -334,10 +360,15 @@ class BotHandlers:
                 ),
                 MessageHandler(
                     filters.TEXT & filters.Regex("^❓ Спросить у ИИ$"),
-                    self.ask_question
+                    self.handle_question
                 )
             ],
             states={
+                DialogState.ASK_REQUEST: [
+                    # ВАЖНО: Сначала отмена, потом основной хендлер!
+                    MessageHandler(filters.Regex(cancel_pattern), self.handle_cancel_button),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.set_llm_request),
+                ],
                 DialogState.SET_CALORIES: [
                     # ВАЖНО: Сначала отмена, потом основной хендлер!
                     MessageHandler(filters.Regex(cancel_pattern), self.handle_cancel_button),

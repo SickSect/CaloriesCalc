@@ -43,10 +43,18 @@ class LLMService:
             log("info", "LLM initialisation ended...")
             return data["response"].strip()
 
-    def ask(self, user_prompt: str) -> str:
+    async def ask(self, user_prompt: str) -> str:
         payload = {
             "model": self.model,
             "timeout": self.timeout,
             "prompt": f"{SYSTEM_PROMPT}\n\n👤 Запрос пользователя: {user_prompt}",
             "stream": self.stream
         }
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.post(
+                url=self.base_url,
+                json=payload
+            )
+            data = resp.json()
+            log("info", "LLM initialisation ended...")
+            return data["response"].strip()

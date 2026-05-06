@@ -27,7 +27,6 @@ async def post_shutdown(application):
 def create_application() -> tuple:
     db = Database()
     calculator = CalorieCalculator()
-    handlers = BotHandlers(db, calculator)
 
     app = (
         ApplicationBuilder()
@@ -43,7 +42,7 @@ def create_application() -> tuple:
 
     app.bot_data["db"] = db
     app.bot_data["llm"] = llm
-
+    handlers = BotHandlers(db, calculator, llm)
     app.add_handler(CommandHandler("start", handlers.start))
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex("^Начать$"),
