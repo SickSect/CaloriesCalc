@@ -48,35 +48,39 @@ class BotHandlers:
 
     async def handle_start_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка кнопки 'Начать'"""
-        user_id = update.effective_user.id
-        if not await self.db.check_user_exists(user_id):
-            await self.db.add_user(user_id)
+        async with self._lock(update.effective_user.id):
+            user_id = update.effective_user.id
+            if not await self.db.check_user_exists(user_id):
+                await self.db.add_user(user_id)
 
-        await send_card(
-            update,
-            context,
-            title="✅ Успешно",
-            fields=[("👤", "Добавил вас!")],
-            footer="Выберите следующее действие ⬇️",
-            keyboard=Keyboards.get_main_keyboard()
-        )
+            await send_card(
+                update,
+                context,
+                title="✅ Успешно",
+                fields=[("👤", "Добавил вас!")],
+                footer="Выберите следующее действие ⬇️",
+                keyboard=Keyboards.get_main_keyboard()
+            )
+
 
     async def handle_today_calories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Просмотр калорий за сегодня"""
-        user_id = update.effective_user.id
-        if not await self.db.check_user_exists(user_id):
-            await self.db.add_user(user_id)
+        async with self._lock(update.effective_user.id):
+            user_id = update.effective_user.id
+            if not await self.db.check_user_exists(user_id):
+                await self.db.add_user(user_id)
 
-        report = await self.db.get_today_calories(user_id)
-        limit = await self.db.get_daily_limit(user_id)
+            report = await self.db.get_today_calories(user_id)
+            limit = await self.db.get_daily_limit(user_id)
 
-        if report:
-            text = print_daily_report(report)
-            if limit:
-                text += f"\nВаш дневной лимит: {limit} калорий"
-            await update.message.reply_text(text, reply_markup=Keyboards.get_main_keyboard())
-        else:
-            await update.message.reply_text("Сегодня калории не записаны", reply_markup=Keyboards.get_main_keyboard())
+            if report:
+                text = print_daily_report(report)
+                if limit:
+                    text += f"\nВаш дневной лимит: {limit} калорий"
+                await update.message.reply_text(text, reply_markup=Keyboards.get_main_keyboard())
+            else:
+                await update.message.reply_text("Сегодня калории не записаны",
+                                                reply_markup=Keyboards.get_main_keyboard())
 
     async def start_calories_setup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Начало установки суточных калорий"""
@@ -94,37 +98,38 @@ class BotHandlers:
         """Обработка ввода суточных калорий"""
         user_id = update.effective_user.id
 
-        # ← ДОБАВЬ: создаём пользователя, если нет
-        if not await self.db.check_user_exists(user_id):
-            await self.db.add_user(user_id)
+        async with self._lock(user_id):
+            # ← ДОБАВЬ: создаём пользователя, если нет
+            if not await self.db.check_user_exists(user_id):
+                await self.db.add_user(user_id)
 
-        text_input = update.message.text
+            text_input = update.message.text
 
-        validation: ValidationResult = InputValidator.validate_calories(text_input)
+            validation: ValidationResult = InputValidator.validate_calories(text_input)
 
-        if not validation.is_valid:
+            if not validation.is_valid:
+                await send_card(
+                    update,
+                    context,
+                    title="Ошибка ввода",
+                    fields=[("✏️", validation.error_message)],
+                    footer="Для отмены используйте кнопку ниже ⬇️",
+                    keyboard=Keyboards.get_cancel_keyboard()
+                )
+                return DialogState.SET_CALORIES
+
+            calories = int(text_input)
+            await self.db.set_daily_calories(user_id, calories)
+
             await send_card(
                 update,
                 context,
-                title="Ошибка ввода",
-                fields=[("✏️", validation.error_message)],
-                footer="Для отмены используйте кнопку ниже ⬇️",
-                keyboard=Keyboards.get_cancel_keyboard()
+                title="Цель установлена ✅",
+                fields=[("🔥", f"Установлено {calories} ккал в день")],
+                footer="Выберите следующее действие ⬇️",
+                keyboard=Keyboards.get_main_keyboard()
             )
-            return DialogState.SET_CALORIES
-
-        calories = int(text_input)
-        await self.db.set_daily_calories(user_id, calories)
-
-        await send_card(
-            update,
-            context,
-            title="Цель установлена ✅",
-            fields=[("🔥", f"Установлено {calories} ккал в день")],
-            footer="Выберите следующее действие ⬇️",
-            keyboard=Keyboards.get_main_keyboard()
-        )
-        return ConversationHandler.END
+            return ConversationHandler.END
 
     async def start_product_adding(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Начало добавления продукта"""
@@ -141,93 +146,96 @@ class BotHandlers:
     async def set_product_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка названия продукта"""
         text_input = update.message.text.strip()
+        user_id = update.effective_user.id
+        async with self._lock(user_id):
+            validation: ValidationResult = InputValidator.validate_product_name(text_input)
+            if not validation.is_valid:
+                await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
+                return DialogState.SET_PRODUCT_NAME
 
-        validation: ValidationResult = InputValidator.validate_product_name(text_input)
-        if not validation.is_valid:
-            await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
-            return DialogState.SET_PRODUCT_NAME
+            context.user_data["product_name"] = text_input
 
-        context.user_data["product_name"] = text_input
-
-        if await self.db.check_product_exists(text_input):
-            product_info = await self.db.get_product_info(text_input)
-            await update.message.reply_text(
-                f"🥦 <b>Информация о продукте</b>\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"📛 <b>Название:</b> <i>{product_info[2]}</i>\n"
-                f"🔥 <b>Калорийность:</b> <code>{product_info[1]} ккал / 100 г</code>\n"
-                f"━━━━━━━━━━━━━━━\n\n"
-                f"Введите вес продукта в граммах ⬇️",
-                parse_mode="HTML",
-                reply_markup=Keyboards.get_cancel_keyboard()
-            )
-            context.user_data["calories_per_hundred"] = product_info[1]
-            return DialogState.SET_PRODUCT_WEIGHT
-        else:
-            await update.message.reply_text(
-                "Продукт не найден. Введите его калорийность на 100 грамм:",
-                reply_markup=Keyboards.get_cancel_keyboard()
-            )
-            return DialogState.SET_TODAY_CALORIES
+            if await self.db.check_product_exists(text_input):
+                product_info = await self.db.get_product_info(text_input)
+                await update.message.reply_text(
+                    f"🥦 <b>Информация о продукте</b>\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"📛 <b>Название:</b> <i>{product_info[2]}</i>\n"
+                    f"🔥 <b>Калорийность:</b> <code>{product_info[1]} ккал / 100 г</code>\n"
+                    f"━━━━━━━━━━━━━━━\n\n"
+                    f"Введите вес продукта в граммах ⬇️",
+                    parse_mode="HTML",
+                    reply_markup=Keyboards.get_cancel_keyboard()
+                )
+                context.user_data["calories_per_hundred"] = product_info[1]
+                return DialogState.SET_PRODUCT_WEIGHT
+            else:
+                await update.message.reply_text(
+                    "Продукт не найден. Введите его калорийность на 100 грамм:",
+                    reply_markup=Keyboards.get_cancel_keyboard()
+                )
+                return DialogState.SET_TODAY_CALORIES
 
     async def set_product_weight(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка веса продукта"""
         text_input = update.message.text.strip()
+        user_id = update.effective_user.id
+        async with self._lock(user_id):
+            validation: ValidationResult = InputValidator.validate_weight(text_input)
+            if not validation.is_valid:
+                await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
+                return DialogState.SET_PRODUCT_WEIGHT
 
-        validation: ValidationResult = InputValidator.validate_weight(text_input)
-        if not validation.is_valid:
-            await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
-            return DialogState.SET_PRODUCT_WEIGHT
+            weight = float(text_input)
+            calories = self.calculator.calculate(
+                float(context.user_data["calories_per_hundred"]),
+                weight
+            )
 
-        weight = float(text_input)
-        calories = self.calculator.calculate(
-            float(context.user_data["calories_per_hundred"]),
-            weight
-        )
+            await self.db.add_calories_for_today(
+                update.effective_user.id,
+                calories,
+                context.user_data["product_name"]
+            )
 
-        await self.db.add_calories_for_today(
-            update.effective_user.id,
-            calories,
-            context.user_data["product_name"]
-        )
-
-        await send_card(
-            update,
-            context,
-            title="Запись добавлена!",
-            fields=[
-                ("📛 Продукт:", context.user_data["product_name"]),
-                ("🔥 Калорийность:", f"{calories} ккал")
-            ],
-            footer="Выберите следующее действие",
-            keyboard=Keyboards.get_main_keyboard()
-        )
-        return ConversationHandler.END
+            await send_card(
+                update,
+                context,
+                title="Запись добавлена!",
+                fields=[
+                    ("📛 Продукт:", context.user_data["product_name"]),
+                    ("🔥 Калорийность:", f"{calories} ккал")
+                ],
+                footer="Выберите следующее действие",
+                keyboard=Keyboards.get_main_keyboard()
+            )
+            return ConversationHandler.END
 
     async def add_calories_for_today(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка ввода калорийности для нового продукта"""
         text_input = update.message.text.strip()
+        user_id = update.effective_user.id
+        async with self._lock(user_id):
+            validation: ValidationResult = InputValidator.validate_calories(text_input)
+            if not validation.is_valid:
+                await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
+                return DialogState.SET_TODAY_CALORIES
 
-        validation: ValidationResult = InputValidator.validate_calories(text_input)
-        if not validation.is_valid:
-            await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
-            return DialogState.SET_TODAY_CALORIES
+            calories = int(text_input)
+            context.user_data["calories_per_hundred"] = calories
 
-        calories = int(text_input)
-        context.user_data["calories_per_hundred"] = calories
+            # Добавляем продукт в базу
+            await self.db.add_product(context.user_data["product_name"], calories)
 
-        # Добавляем продукт в базу
-        await self.db.add_product(context.user_data["product_name"], calories)
-
-        await send_card(
-            update,
-            context,
-            title="Ввод веса",
-            fields=[("⚖️", "Введите вес продукта:")],
-            footer="Для отмены используйте кнопку ниже ⬇️",
-            keyboard=Keyboards.get_cancel_keyboard()
-        )
-        return DialogState.SET_PRODUCT_WEIGHT
+            await send_card(
+                update,
+                context,
+                title="Ввод веса",
+                fields=[("⚖️", "Введите вес продукта:")],
+                footer="Для отмены используйте кнопку ниже ⬇️",
+                keyboard=Keyboards.get_cancel_keyboard()
+            )
+            return DialogState.SET_PRODUCT_WEIGHT
 
     async def start_new_product_adding(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Начало добавления нового продукта в базу"""
@@ -265,22 +273,23 @@ class BotHandlers:
     async def save_new_product(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Сохранение нового продукта"""
         product_calories_input = update.message.text
+        user_id = update.effective_user.id
+        async with self._lock(user_id):
+            validation: ValidationResult = InputValidator.validate_calories(product_calories_input)
+            if not validation.is_valid:
+                await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
+                return DialogState.SAVE_NEW_PRODUCT
 
-        validation: ValidationResult = InputValidator.validate_calories(product_calories_input)
-        if not validation.is_valid:
-            await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
-            return DialogState.SAVE_NEW_PRODUCT
+            await self.db.add_product(
+                context.user_data["product_name_input"],
+                int(product_calories_input)
+            )
 
-        await self.db.add_product(
-            context.user_data["product_name_input"],
-            int(product_calories_input)
-        )
-
-        await update.message.reply_text(
-            "Успешно сохранено",
-            reply_markup=Keyboards.get_main_keyboard()
-        )
-        return ConversationHandler.END
+            await update.message.reply_text(
+                "Успешно сохранено",
+                reply_markup=Keyboards.get_main_keyboard()
+            )
+            return ConversationHandler.END
 
     async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Отмена диалога"""
