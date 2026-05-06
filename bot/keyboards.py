@@ -19,7 +19,7 @@ class Keyboards:
                 [KeyboardButton("➕ Добавить калории")],
                 [KeyboardButton("🔥 Калории сегодня")],
                 [KeyboardButton("🍗 Добавить продукт")],
-                [KeyboardButton("📸 Распознать еду")]
+                [KeyboardButton("❓ Спросить у ИИ")]
             ],
             resize_keyboard=True
         )

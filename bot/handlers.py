@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+
 from telegram import Update
 from telegram.ext import (
     CommandHandler,
@@ -13,6 +15,7 @@ from bot.states import DialogState
 from bot.keyboards import Keyboards
 from core.calculator import CalorieCalculator
 from core.db import Database
+from core.llm_service import LLMService
 from core.str_utils import send_card, print_daily_report
 from core.validator import InputValidator, ValidationResult
 
@@ -40,7 +43,7 @@ class BotHandlers:
                 ("📅", "Установить суточные калории"),
                 ("➕", "Добавить калории"),
                 ("🔥", "Калории сегодня"),
-                ("📸", "Распознать еду")
+                ("❓", "Спросить у ИИ")
             ],
             footer="Выберите действие ниже ⬇️",
             keyboard=Keyboards.get_start_keyboard()
@@ -81,6 +84,9 @@ class BotHandlers:
             else:
                 await update.message.reply_text("Сегодня калории не записаны",
                                                 reply_markup=Keyboards.get_main_keyboard())
+
+    async def ask_questions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+
 
     async def start_calories_setup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Начало установки суточных калорий"""
@@ -326,6 +332,10 @@ class BotHandlers:
                     filters.TEXT & filters.Regex("^🍗 Добавить продукт$"),
                     self.start_new_product_adding
                 ),
+                MessageHandler(
+                    filters.TEXT & filters.Regex("^❓ Спросить у ИИ$"),
+                    self.ask_question
+                )
             ],
             states={
                 DialogState.SET_CALORIES: [

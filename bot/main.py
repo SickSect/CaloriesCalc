@@ -5,6 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 from bot.handlers import BotHandlers
 from core.calculator import CalorieCalculator
 from core.db import Database
+from core.llm_service import LLMService
 from log.log_writer import log
 
 load_dotenv()
@@ -15,7 +16,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 async def post_init(application):
     await application.bot_data["db"].connect()
     log('info', "[DB] connected")
-
+    await application.bot_data["llm"].initialization()
+    log('info', "[LLM] connected")
 
 async def post_shutdown(application):
     await application.bot_data["db"].disconnect()
@@ -35,7 +37,12 @@ def create_application() -> tuple:
         .build()
     )
 
+    url = os.getenv("LLM_BASE_URL")
+    model = os.getenv("LLM_MODEL")
+    llm = LLMService(url, model, 60)
+
     app.bot_data["db"] = db
+    app.bot_data["llm"] = llm
 
     app.add_handler(CommandHandler("start", handlers.start))
     app.add_handler(MessageHandler(
