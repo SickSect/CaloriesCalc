@@ -1,7 +1,13 @@
+import os
+from pathlib import Path
+
+from bot.translator import Translator
 from log.log_writer import log
 import pymorphy3
 
 morph = pymorphy3.MorphAnalyzer(lang='ru')
+
+
 
 def print_daily_report(products: list[tuple[str, int]]):
     total = sum(cal for _, cal in products)
@@ -35,7 +41,11 @@ def multiply_calories(calories_per_hundred, product_weight):
     calories = (product_weight * calories_per_hundred) / 100
     return calories
 
-async def send_card(update, context, title: str, fields: list[tuple[str, str]], footer: str = None, keyboard=None):
+async def send_card(update, context,
+                    title: str,
+                    fields: list[tuple[str, str]],
+                    footer: str = None, keyboard=None,
+                    translator: Translator = None,):
     """
        Универсальная функция для красивого форматирования сообщений в карточках.
 
@@ -47,13 +57,26 @@ async def send_card(update, context, title: str, fields: list[tuple[str, str]], 
        :param keyboard: reply_markup (например, main_keyboard)
        """
 
-    lines = [f"📋 <b>{title}</b>", "━━━━━━━━━━━━━━━"]
-    for label, value in fields:
+    def safe_get(val):
+        if val is None:
+            return ""
+        if translator is None:
+            return str(val)
+        return translator.get(val) if isinstance(val, str) else str(val)
+
+    t_title = safe_get(title)
+    t_fields = [
+        (safe_get(label), safe_get(value))
+        for label, value in fields
+    ]
+    t_footer = safe_get(footer)
+    lines = [f"📋 <b>{t_title}</b>", "━━━━━━━━━━━━━━━"]
+    for label, value in t_fields:
         lines.append(f"{label} <b>{value}</b>")
     lines.append("━━━━━━━━━━━━━━━")
 
-    if footer:
-        lines.append(f"\n{footer}")
+    if t_footer:
+        lines.append(f"\n{t_footer}")
 
     message_text = "\n".join(lines)
 
@@ -62,14 +85,7 @@ async def send_card(update, context, title: str, fields: list[tuple[str, str]], 
         parse_mode="HTML",
         reply_markup=keyboard
     )
+
 def print_help_info():
-     return (
-        "👋 <b>Привет!</b>\n"
-        "Добро пожаловать в <b>Калькулятор Калорий 🍎</b>\n\n"
-        "Выберите действие ниже, чтобы начать:\n\n"
-        "📅 <b>Установить суточные калории</b> - устанавливает потолок калорий на день\n"
-        "➕ <b>Добавить калории</b> - добавляйте количество калорий после приема пищи\n"
-        "🔥 <b>Калории сегодня</b> - посмотреть сколько калорий было сегодня\n"
-        "🧠 <b>Обучить модель</b> - (кнопка будет убрана позже)\n"
-        "📸 <b>Распознать еду</b> - модель предположит продукт и его калорийность"
-    )
+    help_text = translator.get("help")
+    return (help_text)

@@ -1,4 +1,6 @@
 import pytest
+
+
 from core.calculator import CalorieCalculator
 
 

@@ -18,3 +18,8 @@ CREATE TABLE IF NOT EXISTS user_calories_history (
     order_id    INTEGER NOT NULL,
     date        DATE NOT NULL DEFAULT CURRENT_DATE
 );
+
+CREATE TABLE IF NOT EXISTS user_language(
+    telegram_id BIGINT NOT NULL,
+    language_name TEXT UNIQUE NOT NULL
+)

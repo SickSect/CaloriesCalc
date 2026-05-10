@@ -1,5 +1,8 @@
 import re
 
+from bot.translator import Translator
+
+
 def check_if_digits_only(value):
     if re.match(r'^\d+$', value):
         return True
@@ -28,36 +31,36 @@ class InputValidator:
     MAX_WEIGHT = 10000
 
     @staticmethod
-    def validate_calories(value: str) -> ValidationResult:
+    def validate_calories(value: str, translator: Translator) -> ValidationResult:
         """Валидация ввода калорий"""
         try:
             calories = int(value)
             if calories < InputValidator.MIN_CALORIES:
-                return ValidationResult(False, "Калории не могут быть отрицательными")
+                return ValidationResult(False, translator.get("validator.caloriesBelowZero"))
             if calories > InputValidator.MAX_CALORIES:
-                return ValidationResult(False, f"Максимальное значение: {InputValidator.MAX_CALORIES}")
+                return ValidationResult(False, translator.get("validator.moreThanMaxCalories"))
             return ValidationResult(True)
         except ValueError:
-            return ValidationResult(False, "Введите число")
+            return ValidationResult(False, translator.get("validator.enterNum"))
 
     @staticmethod
-    def validate_weight(value: str) -> ValidationResult:
+    def validate_weight(value: str, translator: Translator = None) -> ValidationResult:
         """Валидация веса продукта"""
         try:
             weight = float(value)
             if weight < InputValidator.MIN_WEIGHT:
-                return ValidationResult(False, "Вес должен быть больше 0")
+                return ValidationResult(False, translator.get("validator.weightBelowZero"))
             if weight > InputValidator.MAX_WEIGHT:
-                return ValidationResult(False, f"Максимальный вес: {InputValidator.MAX_WEIGHT}г")
+                return ValidationResult(False, translator.get("validator.moreThanMaxWeight"))
             return ValidationResult(True)
         except ValueError:
-            return ValidationResult(False, "Введите число")
+            return ValidationResult(False, translator.get("validator.enterNum"))
 
     @staticmethod
-    def validate_product_name(name: str) -> ValidationResult:
+    def validate_product_name(name: str, translator: Translator = None) -> ValidationResult:
         """Валидация названия продукта"""
         if not name or not name.strip():
-            return ValidationResult(False, "Название не может быть пустым")
+            return ValidationResult(False, translator.get("validator.emptyName"))
         if len(name.strip()) > InputValidator.MAX_PRODUCT_NAME_LENGTH:
-            return ValidationResult(False, f"Максимальная длина: {InputValidator.MAX_PRODUCT_NAME_LENGTH} символов")
+            return ValidationResult(False, translator.get("validator.moreThanMaxLength"))
         return ValidationResult(True)

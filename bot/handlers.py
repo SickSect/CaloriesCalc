@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 
 from telegram import Update
 from telegram.ext import (
@@ -13,13 +14,15 @@ from telegram.ext import (
 
 from bot.states import DialogState
 from bot.keyboards import Keyboards
+from bot.translator import Translator
 from core.calculator import CalorieCalculator
 from core.db import Database
 from core.llm_service import LLMService
-from core.str_utils import send_card, print_daily_report
+from core.str_utils import print_daily_report, send_card
 from core.validator import InputValidator, ValidationResult
 
 logger = logging.getLogger(__name__)
+
 
 
 class BotHandlers:
@@ -28,6 +31,10 @@ class BotHandlers:
     def __init__(self, db: Database, calculator: CalorieCalculator, llm: LLMService):
         self.db = db
         self.calculator = calculator
+        PROJECT_ROOT = Path(__file__).resolve().parent.parent
+        LOCALES_DIR = PROJECT_ROOT / str(os.getenv("LOCALES_DIR"))
+        default_lang = os.getenv('LANGUAGE')
+        self.translator = Translator(str(LOCALES_DIR), default_lang)
         self.llm = llm
         self._locks: dict[int, asyncio.Lock] = {}
 
@@ -39,15 +46,16 @@ class BotHandlers:
         await send_card(
             update,
             context,
-            title="ℹ️ Справка",
+            title="start.title",
             fields=[
-                ("📅", "Установить суточные калории"),
-                ("➕", "Добавить калории"),
-                ("🔥", "Калории сегодня"),
-                ("❓", "Спросить у ИИ")
+                ("📅", "start.fieldSetDailyCalories"),
+                ("➕", "start.fieldAddCalories"),
+                ("🔥", "start.fieldTodayCalories"),
+                ("❓", "start.fieldAskAI")
             ],
-            footer="Выберите действие ниже ⬇️",
-            keyboard=Keyboards.get_start_keyboard()
+            footer="start.footer",
+            keyboard=Keyboards.get_start_keyboard(),
+            translator=self.translator
         )
 
     async def handle_start_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -60,10 +68,11 @@ class BotHandlers:
             await send_card(
                 update,
                 context,
-                title="✅ Успешно",
-                fields=[("👤", "Добавил вас!")],
-                footer="Выберите следующее действие ⬇️",
-                keyboard=Keyboards.get_main_keyboard()
+                title="handle_start_button.title",
+                fields=[("👤", "handle_start_button.field")],
+                footer="handle_start_button.footer",
+                keyboard=Keyboards.get_main_keyboard(),
+                translator=self.translator
             )
 
 
@@ -80,10 +89,10 @@ class BotHandlers:
             if report:
                 text = print_daily_report(report)
                 if limit:
-                    text += f"\nВаш дневной лимит: {limit} калорий"
+                    text += f"\n{self.translator.get('core.dailyLimit')} {limit} ccal"
                 await update.message.reply_text(text, reply_markup=Keyboards.get_main_keyboard())
             else:
-                await update.message.reply_text("Сегодня калории не записаны",
+                await update.message.reply_text(self.translator.get("error.caloriesNotFoundForToday"),
                                                 reply_markup=Keyboards.get_main_keyboard())
 
     async def handle_question(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -92,10 +101,11 @@ class BotHandlers:
             await send_card(
                 update,
                 context,
-                title="Ввод вопроса",
-                fields=[("🔥", "Пожалуйста, введите свой вопрос")],
-                footer="Для отмены используйте кнопку ниже ⬇️",
-                keyboard=Keyboards.get_cancel_keyboard()
+                title="handle_question.title",
+                fields=[("🔥", "handle_question.field")],
+                footer="handle_question.footer",
+                keyboard=Keyboards.get_cancel_keyboard(),
+                translator=self.translator
             )
             return DialogState.ASK_REQUEST
 
@@ -104,10 +114,11 @@ class BotHandlers:
         await send_card(
             update,
             context,
-            title="Ввод калорий",
-            fields=[("🔥", "Пожалуйста, введите количество калорий:")],
-            footer="Для отмены используйте кнопку ниже ⬇️",
-            keyboard=Keyboards.get_cancel_keyboard()
+            title="start_calories_setup.title",
+            fields=[("🔥", "start_calories_setup.field")],
+            footer="start_calories_setup.footer",
+            keyboard=Keyboards.get_cancel_keyboard(),
+            translator=self.translator
         )
         return DialogState.SET_CALORIES
 
@@ -119,10 +130,11 @@ class BotHandlers:
             await send_card(
                 update,
                 context,
-                title="Результат запрос",
+                title="set_llm_request.title",
                 fields=[("🔥", result)],
-                footer="Выберите следующее действие ⬇️",
-                keyboard=Keyboards.get_main_keyboard()
+                footer="set_llm_request.footer",
+                keyboard=Keyboards.get_main_keyboard(),
+                translator=self.translator
             )
             return ConversationHandler.END
 
@@ -137,16 +149,17 @@ class BotHandlers:
 
             text_input = update.message.text
 
-            validation: ValidationResult = InputValidator.validate_calories(text_input)
+            validation: ValidationResult = InputValidator.validate_calories(text_input, self.translator)
 
             if not validation.is_valid:
                 await send_card(
                     update,
                     context,
-                    title="Ошибка ввода",
+                    title="set_calories.title_error",
                     fields=[("✏️", validation.error_message)],
-                    footer="Для отмены используйте кнопку ниже ⬇️",
-                    keyboard=Keyboards.get_cancel_keyboard()
+                    footer="set_calories.footer_error",
+                    keyboard=Keyboards.get_cancel_keyboard(),
+                    translator=self.translator
                 )
                 return DialogState.SET_CALORIES
 
@@ -156,10 +169,11 @@ class BotHandlers:
             await send_card(
                 update,
                 context,
-                title="Цель установлена ✅",
-                fields=[("🔥", f"Установлено {calories} ккал в день")],
-                footer="Выберите следующее действие ⬇️",
-                keyboard=Keyboards.get_main_keyboard()
+                title="set_calories.title",
+                fields=[("🟢", "set_calories.field"), ("🔥", calories)],
+                footer="set_calories.footer_error",
+                keyboard=Keyboards.get_main_keyboard(),
+                translator=self.translator
             )
             return ConversationHandler.END
 
@@ -168,10 +182,11 @@ class BotHandlers:
         await send_card(
             update,
             context,
-            title="Ввод продукта",
-            fields=[("📛", "Пожалуйста, введите название продукта:")],
-            footer="Для отмены используйте кнопку ниже ⬇️",
-            keyboard=Keyboards.get_cancel_keyboard()
+            title="start_product_adding.title",
+            fields=[("📛", "start_product_adding.field")],
+            footer="start_product_adding.footer",
+            keyboard=Keyboards.get_cancel_keyboard(),
+            translator=self.translator
         )
         return DialogState.SET_PRODUCT_NAME
 
@@ -180,7 +195,7 @@ class BotHandlers:
         text_input = update.message.text.strip()
         user_id = update.effective_user.id
         async with self._lock(user_id):
-            validation: ValidationResult = InputValidator.validate_product_name(text_input)
+            validation: ValidationResult = InputValidator.validate_product_name(text_input,self.translator)
             if not validation.is_valid:
                 await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
                 return DialogState.SET_PRODUCT_NAME
@@ -189,21 +204,22 @@ class BotHandlers:
 
             if await self.db.check_product_exists(text_input):
                 product_info = await self.db.get_product_info(text_input)
-                await update.message.reply_text(
-                    f"🥦 <b>Информация о продукте</b>\n"
-                    f"━━━━━━━━━━━━━━━\n"
-                    f"📛 <b>Название:</b> <i>{product_info[2]}</i>\n"
-                    f"🔥 <b>Калорийность:</b> <code>{product_info[1]} ккал / 100 г</code>\n"
-                    f"━━━━━━━━━━━━━━━\n\n"
-                    f"Введите вес продукта в граммах ⬇️",
-                    parse_mode="HTML",
-                    reply_markup=Keyboards.get_cancel_keyboard()
+                await send_card(
+                    update, context,
+                    title="product.info.title",
+                    fields=[
+                        ("set_product_name.fieldNameLabel", product_info[2]),  # (иконка, ключ перевода, значение)
+                        ("set_product_name.fieldCCalLabel", f"{product_info[1]} ccal / 100 g")
+                    ],
+                    footer="set_product_name.enter_weight",
+                    keyboard=Keyboards.get_cancel_keyboard(),
+                    translator=self.translator  # возьми из контекста: context.user_data.get("lang", "ru")
                 )
                 context.user_data["calories_per_hundred"] = product_info[1]
                 return DialogState.SET_PRODUCT_WEIGHT
             else:
                 await update.message.reply_text(
-                    "Продукт не найден. Введите его калорийность на 100 грамм:",
+                    self.translator.get("error.productNotFound"),
                     reply_markup=Keyboards.get_cancel_keyboard()
                 )
                 return DialogState.SET_TODAY_CALORIES
@@ -213,7 +229,7 @@ class BotHandlers:
         text_input = update.message.text.strip()
         user_id = update.effective_user.id
         async with self._lock(user_id):
-            validation: ValidationResult = InputValidator.validate_weight(text_input)
+            validation: ValidationResult = InputValidator.validate_weight(text_input,self.translator)
             if not validation.is_valid:
                 await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
                 return DialogState.SET_PRODUCT_WEIGHT
@@ -233,13 +249,14 @@ class BotHandlers:
             await send_card(
                 update,
                 context,
-                title="Запись добавлена!",
+                title="set_product_weight.title",
                 fields=[
-                    ("📛 Продукт:", context.user_data["product_name"]),
-                    ("🔥 Калорийность:", f"{calories} ккал")
+                    ("set_product_weight.label_product", context.user_data["product_name"]),
+                    ("set_product_weight.label_ccal", f"{calories}")
                 ],
-                footer="Выберите следующее действие",
-                keyboard=Keyboards.get_main_keyboard()
+                footer="set_product_weight.footer",
+                keyboard=Keyboards.get_main_keyboard(),
+                translator=self.translator
             )
             return ConversationHandler.END
 
@@ -248,7 +265,7 @@ class BotHandlers:
         text_input = update.message.text.strip()
         user_id = update.effective_user.id
         async with self._lock(user_id):
-            validation: ValidationResult = InputValidator.validate_calories(text_input)
+            validation: ValidationResult = InputValidator.validate_calories(text_input,self.translator)
             if not validation.is_valid:
                 await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
                 return DialogState.SET_TODAY_CALORIES
@@ -262,10 +279,11 @@ class BotHandlers:
             await send_card(
                 update,
                 context,
-                title="Ввод веса",
-                fields=[("⚖️", "Введите вес продукта:")],
-                footer="Для отмены используйте кнопку ниже ⬇️",
-                keyboard=Keyboards.get_cancel_keyboard()
+                title="add_calories_for_today.title",
+                fields=[("⚖️", "add_calories_for_today.field")],
+                footer="add_calories_for_today.footer",
+                keyboard=Keyboards.get_cancel_keyboard(),
+                translator=self.translator
             )
             return DialogState.SET_PRODUCT_WEIGHT
 
@@ -274,10 +292,11 @@ class BotHandlers:
         await send_card(
             update,
             context,
-            title="Ввод продукта",
-            fields=[("📛", "Пожалуйста, введите название продукта:")],
-            footer="Для отмены используйте кнопку ниже ⬇️",
-            keyboard=Keyboards.get_cancel_keyboard()
+            title="start_new_product_adding.title",
+            fields=[("📛", "start_new_product_adding.field")],
+            footer="start_new_product_adding.footer",
+            keyboard=Keyboards.get_cancel_keyboard(),
+            translator=self.translator
         )
         return DialogState.SET_NEW_PRODUCT_CALORIES
 
@@ -285,7 +304,7 @@ class BotHandlers:
         """Ввод калорийности нового продукта"""
         product_name_input = update.message.text
 
-        validation: ValidationResult = InputValidator.validate_product_name(product_name_input)
+        validation: ValidationResult = InputValidator.validate_product_name(product_name_input,self.translator)
         if not validation.is_valid:
             await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
             return DialogState.SET_NEW_PRODUCT_CALORIES
@@ -295,10 +314,11 @@ class BotHandlers:
         await send_card(
             update,
             context,
-            title="Ввод калорийности",
-            fields=[("🍽", "Пожалуйста, введите количество калорий на 100 г продукта:")],
-            footer="Для отмены используйте кнопку ниже ⬇️",
-            keyboard=Keyboards.get_cancel_keyboard()
+            title="start_new_product_calories.title",
+            fields=[("🍽", "start_new_product_calories.field")],
+            footer="start_new_product_calories.footer",
+            keyboard=Keyboards.get_cancel_keyboard(),
+            translator=self.translator
         )
         return DialogState.SAVE_NEW_PRODUCT
 
@@ -307,7 +327,7 @@ class BotHandlers:
         product_calories_input = update.message.text
         user_id = update.effective_user.id
         async with self._lock(user_id):
-            validation: ValidationResult = InputValidator.validate_calories(product_calories_input)
+            validation: ValidationResult = InputValidator.validate_calories(product_calories_input,self.translator)
             if not validation.is_valid:
                 await update.message.reply_text(validation.error_message, reply_markup=Keyboards.get_cancel_keyboard())
                 return DialogState.SAVE_NEW_PRODUCT
@@ -318,7 +338,7 @@ class BotHandlers:
             )
 
             await update.message.reply_text(
-                "Успешно сохранено",
+                self.translator.get("core.successSave"),
                 reply_markup=Keyboards.get_main_keyboard()
             )
             return ConversationHandler.END
@@ -328,10 +348,11 @@ class BotHandlers:
         await send_card(
             update,
             context,
-            title="❌ Операция отменена",
+            title="cancel.title",
             fields=[],
-            footer="Выберите следующее действие ⬇️",
-            keyboard=Keyboards.get_main_keyboard()
+            footer="cancel.footer",
+            keyboard=Keyboards.get_main_keyboard(),
+            translator=self.translator
         )
         return ConversationHandler.END
 
@@ -342,24 +363,28 @@ class BotHandlers:
     def get_conversation_handler(self) -> ConversationHandler:
         """Создание ConversationHandler"""
         # Regex паттерн для кнопки отмены
-        cancel_pattern = r"^(❌ Отмена|Отмена)$"
+        cancel_pattern = self.translator.get("pattern.cancel")
+        start_calories_setup_pattern = self.translator.get("pattern.set_daily_calories")
+        start_product_adding_pattern = self.translator.get("pattern.start_product_adding")
+        start_new_product_adding_pattern = self.translator.get("pattern.start_new_product_adding")
+        handle_question_pattern = self.translator.get("pattern.handle_question")
 
         return ConversationHandler(
             entry_points=[
                 MessageHandler(
-                    filters.TEXT & filters.Regex("^📅 Установить суточные калории$"),
+                    filters.TEXT & filters.Regex(start_calories_setup_pattern),
                     self.start_calories_setup
                 ),
                 MessageHandler(
-                    filters.TEXT & filters.Regex("^➕ Добавить калории$"),
+                    filters.TEXT & filters.Regex(start_product_adding_pattern),
                     self.start_product_adding
                 ),
                 MessageHandler(
-                    filters.TEXT & filters.Regex("^🍗 Добавить продукт$"),
+                    filters.TEXT & filters.Regex(start_new_product_adding_pattern),
                     self.start_new_product_adding
                 ),
                 MessageHandler(
-                    filters.TEXT & filters.Regex("^❓ Спросить у ИИ$"),
+                    filters.TEXT & filters.Regex(handle_question_pattern),
                     self.handle_question
                 )
             ],
