@@ -75,7 +75,9 @@
     "start_product_adding": "^➕ Добавить калории$",
     "start_new_product_adding": "^\uD83C\uDF57 Добавить продукт$",
     "handle_question": "❓ Спросить у ИИ$",
-    "cancel": "^(❌ Отмена|Отмена)$"
+    "cancel": "^(❌ Отмена|Отмена)$",
+    "start": "^Начать$",
+    "todayCalories": "^\uD83D\uDD25 Калории сегодня$"
   },
   "validator": {
     "caloriesBelowZero": "Калории не могут быть отрицательными",
@@ -93,5 +95,14 @@
   "core": {
     "dailyLimit": "Ваш дневной лимит:",
     "successSave": "Успешно сохранено"
+  },
+  "keyboard": {
+    "setDailyCalories": "\uD83D\uDCC5 Установить суточные калории",
+    "addCalories": "➕ Добавить калории",
+    "todayCalories": "\uD83D\uDD25 Калории сегодня",
+    "addProduct": "\uD83C\uDF57 Добавить продукт",
+    "askQuestion": "❓ Спросить у ИИ",
+    "cancel": "❌ Отмена",
+    "start": "Начать"
   }
 }

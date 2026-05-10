@@ -1,32 +1,34 @@
 from telegram import KeyboardButton, ReplyKeyboardMarkup
 
+from bot.translator import Translator
+
 
 class Keyboards:
     """Фабрика клавиатур"""
 
     @staticmethod
-    def get_start_keyboard() -> ReplyKeyboardMarkup:
+    def get_start_keyboard(translator: Translator) -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
-            [[KeyboardButton("Начать")]],
+            [[KeyboardButton(translator.get("keyboard.start"))]],
             resize_keyboard=True
         )
 
     @staticmethod
-    def get_main_keyboard() -> ReplyKeyboardMarkup:
+    def get_main_keyboard(translator: Translator) -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
             [
-                [KeyboardButton("📅 Установить суточные калории")],
-                [KeyboardButton("➕ Добавить калории")],
-                [KeyboardButton("🔥 Калории сегодня")],
-                [KeyboardButton("🍗 Добавить продукт")],
-                [KeyboardButton("❓ Спросить у ИИ")]
+                [KeyboardButton(translator.get("keyboard.setDailyCalories"))],
+                [KeyboardButton(translator.get("keyboard.addCalories"))],
+                [KeyboardButton(translator.get("keyboard.todayCalories"))],
+                [KeyboardButton(translator.get("keyboard.addProduct"))],
+                [KeyboardButton(translator.get("keyboard.askQuestion"))]
             ],
             resize_keyboard=True
         )
 
     @staticmethod
-    def get_cancel_keyboard() -> ReplyKeyboardMarkup:
+    def get_cancel_keyboard(translator: Translator) -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
-            [[KeyboardButton("❌ Отмена")]],
+            [[KeyboardButton(translator.get("keyboard.cancel"))]],
             resize_keyboard=True
         )

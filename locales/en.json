@@ -1,3 +1,108 @@
 {
-
+  "help": "👋 <b>Hi there!</b>\nWelcome to the <b>Calorie Tracker 🍎</b>\n\nChoose an action below to get started:\n\n📅 <b>Set Daily Calories</b> - sets your daily calorie limit\n➕ <b>Add Calories</b> - log calories after a meal\n🔥 <b>Today's Calories</b> - check your daily intake\n🧠 <b>Train the Model</b> - (button will be removed later)\n📸 <b>Recognize Food</b> - AI will guess the product and its calories",
+  "start": {
+    "title": "ℹ️ Help",
+    "fieldSetDailyCalories": "Set Daily Calories",
+    "fieldTodayCalories": "Today's Calories",
+    "fieldAskAI": "Ask AI",
+    "fieldAddCalories": "Add Calories",
+    "footer": "Choose an action below ⬇️"
+  },
+  "handle_start_button": {
+    "title": "✅ Success",
+    "field": "You've been added!",
+    "footer": "Choose your next action ⬇️"
+  },
+  "handle_question": {
+    "title": "Ask a Question",
+    "field": "Please type your question",
+    "footer": "Use the button below to cancel ⬇️"
+  },
+  "start_calories_setup": {
+    "title": "Calorie Input",
+    "field": "Please enter your calorie amount:",
+    "footer": "Use the button below to cancel ⬇️"
+  },
+  "set_llm_request": {
+    "title": "Query Result",
+    "footer": "Choose your next action ⬇️"
+  },
+  "set_calories": {
+    "title_error": "Input Error",
+    "title": "Successfully Saved",
+    "footer_error": "Use the button below to cancel ⬇️",
+    "footer": "Choose your next action ⬇️",
+    "field": "Daily calories set to:"
+  },
+  "start_product_adding": {
+    "title": "Add Product",
+    "footer": "Use the button below to cancel ⬇️",
+    "field": "Please enter the product name:"
+  },
+  "set_product_weight": {
+    "title": "Entry Added!",
+    "label_product": " 📛 Product:",
+    "label_ccal": "🔥 Calories",
+    "footer": "Use the button below to cancel ⬇️"
+  },
+  "add_calories_for_today": {
+    "title": "Enter Weight",
+    "footer": "Use the button below to cancel ⬇️",
+    "field": "Enter product weight:"
+  },
+  "start_new_product_adding": {
+    "title": "Add New Product",
+    "footer": "Use the button below to cancel ⬇️",
+    "field": "Please enter the product name:"
+  },
+  "start_new_product_calories": {
+    "title": "Enter Calories",
+    "footer": "Use the button below to cancel ⬇️",
+    "field": "Please enter calories per 100g:"
+  },
+  "cancel": {
+    "title": "❌ Operation Cancelled",
+    "footer": "Choose your next action ⬇️"
+  },
+  "set_product_name": {
+    "title": "Product Info",
+    "fieldNameLabel": "📛 Name:",
+    "fieldCCalLabel": "🔥 Calories:",
+    "enter_weight": "Enter product weight in grams ⬇️"
+  },
+  "pattern": {
+    "set_daily_calories": "^📅 Set Daily Calories$",
+    "start_product_adding": "^➕ Add Calories$",
+    "start_new_product_adding": "^🍗 Add Product$",
+    "handle_question": "❓ Ask AI$",
+    "cancel": "^(❌ Cancel|Cancel)$",
+    "start": "^Start",
+    "todayCalories": "^\uD83D\uDD25 Today's Calories$"
+  },
+  "validator": {
+    "caloriesBelowZero": "Calories cannot be negative",
+    "moreThanMaxCalories": "Maximum calorie limit exceeded",
+    "enterNum": "Please enter a number",
+    "weightBelowZero": "Weight must be greater than 0",
+    "moreThanMaxWeight": "Maximum weight limit exceeded",
+    "emptyName": "Name cannot be empty",
+    "moreThanMaxLength": "Name exceeds maximum length"
+  },
+  "error": {
+    "productNotFound": "Product not found. Please enter its calories per 100g:",
+    "caloriesNotFoundForToday": "No calories logged today"
+  },
+  "core": {
+    "dailyLimit": "Your daily limit:",
+    "successSave": "Successfully saved"
+  },
+  "keyboard": {
+    "setDailyCalories": "📅 Set Daily Calories",
+    "addCalories": "➕ Add Calories",
+    "todayCalories": "🔥 Today's Calories",
+    "addProduct": "🍗 Add Product",
+    "askQuestion": "❓ Ask AI",
+    "cancel": "❌ Cancel",
+    "start": "Start"
+  }
 }

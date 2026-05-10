@@ -1,8 +1,11 @@
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 
 from bot.handlers import BotHandlers
+from bot.translator import Translator
 from core.calculator import CalorieCalculator
 from core.db import Database
 from core.llm_service import LLMService
@@ -39,17 +42,23 @@ def create_application() -> tuple:
     url = os.getenv("LLM_BASE_URL")
     model = os.getenv("LLM_MODEL")
     llm = LLMService(url, model, 60)
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    LOCALES_DIR = PROJECT_ROOT / str(os.getenv("LOCALES_DIR"))
+    default_lang = os.getenv('LANGUAGE')
+    translator = Translator(str(LOCALES_DIR), default_lang)
 
     app.bot_data["db"] = db
     app.bot_data["llm"] = llm
-    handlers = BotHandlers(db, calculator, llm)
+    app.bot_data["translator"] = translator
+
+    handlers = BotHandlers(db, calculator, llm, translator)
     app.add_handler(CommandHandler("start", handlers.start))
     app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^Начать$"),
+        filters.TEXT & filters.Regex(translator.get("pattern.start")),
         handlers.handle_start_button
     ))
     app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^🔥 Калории сегодня$"),
+        filters.TEXT & filters.Regex(translator.get("pattern.todayCalories")),
         handlers.handle_today_calories
     ))
     app.add_handler(handlers.get_conversation_handler())
